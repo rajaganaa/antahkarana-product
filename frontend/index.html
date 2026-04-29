@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Antahkarana — MedAssist AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --primary: #00d4aa;
+      --primary-dark: #00a885;
+      --bg: #080c18;
+      --surface: #0f1824;
+      --surface2: #161f30;
+      --border: #1e2d3d;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --purple: #8b5cf6;
+      --blue: #3b82f6;
+      --orange: #f97316;
+      --teal: #14b8a6;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #080c18 0%, #0f1824 60%, #0a1520 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      position: relative;
+    }
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--primary), transparent);
+    }
+    .logo-icon {
+      width: 48px; height: 48px;
+      background: linear-gradient(135deg, var(--primary), var(--purple));
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+    .logo-text h1 {
+      font-family: 'Space Mono', monospace;
+      font-size: 1.4rem;
+      color: var(--primary);
+      letter-spacing: -0.5px;
+    }
+    .logo-text p {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .header-badges {
+      margin-left: auto;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .badge {
+      font-size: 0.7rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+    }
+    .badge-green { background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
+    .badge-purple { background: rgba(139,92,246,0.15); color: var(--purple); border: 1px solid rgba(139,92,246,0.3); }
+    .badge-blue { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.3); }
+
+    /* ── Main layout ── */
+    .container {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+
+    /* ── Input Panel ── */
+    .input-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      position: sticky;
+      top: 1rem;
+    }
+    .panel-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--primary);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .panel-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Image upload */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+    .upload-zone:hover { border-color: var(--primary); background: rgba(0,212,170,0.04); }
+    .upload-zone.has-image { border-color: var(--success); border-style: solid; }
+    .upload-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .upload-text { font-size: 0.82rem; color: var(--muted); }
+    .upload-subtext { font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; }
+    #fileInput { display: none; }
+    #imagePreview {
+      max-width: 100%;
+      max-height: 180px;
+      border-radius: 8px;
+      object-fit: contain;
+      display: none;
+    }
+
+    /* Question input */
+    textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      padding: 0.8rem 1rem;
+      resize: vertical;
+      min-height: 100px;
+      margin-bottom: 1rem;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { outline: none; border-color: var(--primary); }
+    textarea::placeholder { color: var(--muted); }
+
+    /* Example questions */
+    .examples-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+      font-family: 'Space Mono', monospace;
+    }
+    .example-pills {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+    }
+    .pill {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.45rem 0.75rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: left;
+    }
+    .pill:hover { border-color: var(--primary); color: var(--text); background: rgba(0,212,170,0.04); }
+
+    /* Submit button */
+    button.submit-btn {
+      width: 100%;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      padding: 0.85rem;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+    }
+    button.submit-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    button.submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* API URL */
+    .api-config {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .api-config label { font-size: 0.72rem; color: var(--muted); display: block; margin-bottom: 0.3rem; }
+    .api-config input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72rem;
+      padding: 0.5rem 0.75rem;
+    }
+    .api-config input:focus { outline: none; border-color: var(--primary); }
+
+    /* ── Results Panel ── */
+    .results-panel { display: flex; flex-direction: column; gap: 1rem; }
+
+    /* Welcome state */
+    .welcome-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+    .welcome-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .welcome-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 1.1rem;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+    .welcome-text { font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+
+    /* Pipeline overview */
+    .pipeline-steps {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 1.5rem;
+    }
+    .pipeline-step {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.72rem;
+      font-family: 'Space Mono', monospace;
+      color: var(--muted);
+    }
+
+    /* ── Reasoning Trace Cards ── */
+    .trace-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      animation: slideIn 0.4s ease;
+      opacity: 0;
+      animation-fill-mode: forwards;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .trace-card:nth-child(1) { animation-delay: 0.05s; }
+    .trace-card:nth-child(2) { animation-delay: 0.15s; }
+    .trace-card:nth-child(3) { animation-delay: 0.25s; }
+    .trace-card:nth-child(4) { animation-delay: 0.35s; }
+    .trace-card:nth-child(5) { animation-delay: 0.45s; }
+    .trace-card:nth-child(6) { animation-delay: 0.55s; }
+    .trace-card:nth-child(7) { animation-delay: 0.65s; }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.85rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+    }
+    .card-header:hover { background: rgba(255,255,255,0.02); }
+    .step-badge {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 700;
+    }
+    .card-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex: 1;
+    }
+    .card-status {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-family: 'Space Mono', monospace;
+    }
+    .card-chevron {
+      font-size: 0.7rem;
+      color: var(--muted);
+      transition: transform 0.2s;
+    }
+    .card-chevron.open { transform: rotate(90deg); }
+
+    .card-body {
+      padding: 1.2rem;
+      border-top: 0;
+      display: none;
+    }
+    .card-body.open { display: block; }
+
+    /* Card color themes */
+    .card-vision .step-badge { background: rgba(249,115,22,0.15); color: var(--orange); border: 1px solid rgba(249,115,22,0.3); }
+    .card-vision .card-title { color: var(--orange); }
+    .card-manas .step-badge { background: rgba(139,92,246,0.15); color: var(--purple); border: 1px solid rgba(139,92,246,0.3); }
+    .card-manas .card-title { color: var(--purple); }
+    .card-chitta .step-badge { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.3); }
+    .card-chitta .card-title { color: var(--blue); }
+    .card-buddhi .step-badge { background: rgba(0,212,170,0.15); color: var(--primary); border: 1px solid rgba(0,212,170,0.3); }
+    .card-buddhi .card-title { color: var(--primary); }
+    .card-ahamkara .step-badge { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+    .card-ahamkara .card-title { color: var(--warning); }
+    .card-sakshi .step-badge { background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
+    .card-sakshi .card-title { color: var(--success); }
+    .card-answer .step-badge { background: rgba(0,212,170,0.2); color: var(--primary); border: 1px solid var(--primary); }
+    .card-answer .card-title { color: var(--primary); }
+
+    /* Data display */
+    .kv-grid {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 0.5rem 1rem;
+      font-size: 0.82rem;
+    }
+    .kv-key { color: var(--muted); font-family: 'Space Mono', monospace; font-size: 0.72rem; }
+    .kv-val { color: var(--text); word-break: break-word; }
+
+    .chunk-list { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.5rem; }
+    .chunk-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.7rem;
+      font-size: 0.78rem;
+    }
+    .chunk-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.3rem;
+      font-family: 'Space Mono', monospace;
+    }
+    .chunk-source { color: var(--primary); font-size: 0.68rem; }
+    .chunk-score {
+      font-size: 0.68rem;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: rgba(0,212,170,0.1);
+      color: var(--primary);
+    }
+    .chunk-text { color: var(--muted); line-height: 1.5; }
+
+    .reasoning-steps { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+    .step-item {
+      display: flex;
+      gap: 0.75rem;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+    .step-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(0,212,170,0.15);
+      border: 1px solid rgba(0,212,170,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      color: var(--primary);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .score-bar-wrap { margin-top: 0.75rem; }
+    .score-bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      margin-bottom: 0.3rem;
+    }
+    .score-bar-bg {
+      background: var(--surface2);
+      border-radius: 20px;
+      height: 8px;
+      overflow: hidden;
+    }
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 20px;
+      transition: width 0.8s ease;
+      background: linear-gradient(90deg, var(--primary), var(--success));
+    }
+
+    .flags-list { display: flex; flex-direction: column; gap: 0.4rem; }
+    .flag-item {
+      display: flex;
+      gap: 0.5rem;
+      font-size: 0.78rem;
+      color: var(--warning);
+      background: rgba(245,158,11,0.08);
+      border: 1px solid rgba(245,158,11,0.2);
+      border-radius: 6px;
+      padding: 0.4rem 0.6rem;
+    }
+
+    /* Final answer */
+    .final-answer-box {
+      background: linear-gradient(135deg, rgba(0,212,170,0.08), rgba(139,92,246,0.05));
+      border: 1px solid rgba(0,212,170,0.3);
+      border-radius: 12px;
+      padding: 1.2rem;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+
+    .disclaimer {
+      margin-top: 0.75rem;
+      font-size: 0.75rem;
+      color: var(--warning);
+      background: rgba(245,158,11,0.06);
+      border: 1px solid rgba(245,158,11,0.2);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+    }
+
+    /* Loading skeleton */
+    .loading-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.2rem;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .skel { background: var(--border); border-radius: 4px; margin-bottom: 0.5rem; }
+
+    /* Error */
+    .error-card {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 12px;
+      padding: 1.2rem;
+      color: var(--danger);
+      font-size: 0.85rem;
+    }
+
+    /* Latency chip */
+    .latency-chip {
+      font-size: 0.68rem;
+      font-family: 'Space Mono', monospace;
+      color: var(--muted);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2px 8px;
+    }
+
+    /* Medicine info grid */
+    .med-info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.6rem;
+      margin-top: 0.5rem;
+    }
+    .med-info-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+    }
+    .med-info-label { font-size: 0.65rem; color: var(--muted); font-family: 'Space Mono', monospace; margin-bottom: 2px; }
+    .med-info-value { font-size: 0.82rem; color: var(--text); }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+    footer span { color: var(--primary); }
+
+    @media (max-width: 900px) {
+      .container { grid-template-columns: 1fr; }
+      .input-panel { position: static; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo-icon">🧠</div>
+  <div class="logo-text">
+    <h1>ANTAHKARANA</h1>
+    <p>5-Component Medical Reasoning Engine · RAJAGANAPATHY M, SRM University</p>
+  </div>
+  <div class="header-badges">
+    <span class="badge badge-green">Qwen2.5-7B</span>
+    <span class="badge badge-purple">BLIP-2</span>
+    <span class="badge badge-blue">ChromaDB RAG</span>
+  </div>
+</header>
+
+<!-- MAIN -->
+<div class="container">
+
+  <!-- INPUT PANEL -->
+  <div class="input-panel">
+    <div class="panel-title">🔬 Query Input</div>
+
+    <!-- Image Upload -->
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+      <img id="imagePreview" src="" alt="Medicine image" />
+      <div id="uploadPlaceholder">
+        <div class="upload-icon">💊</div>
+        <div class="upload-text">Upload medicine image</div>
+        <div class="upload-subtext">BLIP-2 will extract drug name, strength, expiry date</div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" onchange="handleImageUpload(event)" />
+    </div>
+    <button onclick="clearImage()" id="clearBtn" style="display:none;width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:0.4rem;font-size:0.75rem;cursor:pointer;margin-bottom:0.75rem;">✕ Remove image</button>
+
+    <!-- Question -->
+    <textarea id="questionInput" placeholder="Ask anything about medications...
+
+E.g.: What is the maximum dose of paracetamol for adults?
+E.g.: Is this medicine expired?
+E.g.: What are the side effects of ibuprofen?"></textarea>
+
+    <!-- Examples -->
+    <div class="examples-label">EXAMPLE QUESTIONS</div>
+    <div class="example-pills">
+      <div class="pill" onclick="setQ(this)">What is the maximum dose of paracetamol for adults?</div>
+      <div class="pill" onclick="setQ(this)">Calculate dosage for a 25kg child — amoxicillin</div>
+      <div class="pill" onclick="setQ(this)">What are the side effects of ibuprofen?</div>
+      <div class="pill" onclick="setQ(this)">Is metformin safe for kidney disease patients?</div>
+      <div class="pill" onclick="setQ(this)">What are FDA-reported adverse reactions for cetirizine?</div>
+    </div>
+
+    <button class="submit-btn" id="submitBtn" onclick="runPipeline()">
+      ⚡ RUN ANTAHKARANA PIPELINE
+    </button>
+
+    <!-- API Config -->
+    <div class="api-config">
+      <label>BACKEND API URL</label>
+      <input type="text" id="apiUrl" value="http://antahkarana-api.centralindia.azurecontainer.io:8000" placeholder="http://localhost:8000" />
+    </div>
+  </div>
+
+  <!-- RESULTS PANEL -->
+  <div class="results-panel" id="resultsPanel">
+
+    <!-- Welcome -->
+    <div class="welcome-card" id="welcomeCard">
+      <div class="welcome-icon">🔮</div>
+      <div class="welcome-title">Antahkarana Reasoning Engine</div>
+      <div class="welcome-text">
+        Upload a medicine image and ask a question.<br/>
+        The 5-component pipeline will reason through your query step by step<br/>
+        and show you the complete reasoning trace.
+      </div>
+      <div class="pipeline-steps">
+        <div class="pipeline-step">👁 Vision</div>
+        <div class="pipeline-step">🧭 Manas</div>
+        <div class="pipeline-step">📚 Chitta</div>
+        <div class="pipeline-step">🧠 Buddhi</div>
+        <div class="pipeline-step">⚖️ Ahamkara</div>
+        <div class="pipeline-step">👁‍🗨 Sakshi</div>
+        <div class="pipeline-step">✅ Answer</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  Built by <span>RAJAGANAPATHY M</span> · SRM University · Antahkarana Research Project<br/>
+  NLP: Qwen2.5-7B-Instruct · VLM: BLIP-2 Flan-T5-XL · RAG: ChromaDB + HuggingFace MiniLM
+</footer>
+
+<script>
+  let selectedFile = null;
+
+  function setQ(el) {
+    document.getElementById('questionInput').value = el.textContent.trim();
+  }
+
+  function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    selectedFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const preview = document.getElementById('imagePreview');
+      const placeholder = document.getElementById('uploadPlaceholder');
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+      placeholder.style.display = 'none';
+      document.getElementById('uploadZone').classList.add('has-image');
+      document.getElementById('clearBtn').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearImage() {
+    selectedFile = null;
+    document.getElementById('fileInput').value = '';
+    document.getElementById('imagePreview').style.display = 'none';
+    document.getElementById('uploadPlaceholder').style.display = 'block';
+    document.getElementById('uploadZone').classList.remove('has-image');
+    document.getElementById('clearBtn').style.display = 'none';
+  }
+
+  async function runPipeline() {
+    const question = document.getElementById('questionInput').value.trim();
+    if (!question) { alert('Please enter a question.'); return; }
+
+    const apiBase = document.getElementById('apiUrl').value.trim();
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Running pipeline...';
+
+    showLoading();
+
+    try {
+      const formData = new FormData();
+      formData.append('question', question);
+      if (selectedFile) formData.append('image', selectedFile);
+
+      const resp = await fetch(`${apiBase}/reason`, { method: 'POST', body: formData });
+      if (!resp.ok) throw new Error(`API error ${resp.status}: ${await resp.text()}`);
+      const data = await resp.json();
+      renderTrace(data);
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '⚡ RUN ANTAHKARANA PIPELINE';
+    }
+  }
+
+  function showLoading() {
+    document.getElementById('welcomeCard').style.display = 'none';
+    const panel = document.getElementById('resultsPanel');
+    panel.innerHTML = '';
+    for (let i = 0; i < 4; i++) {
+      const card = document.createElement('div');
+      card.className = 'loading-card';
+      card.innerHTML = `
+        <div class="skel" style="height:16px;width:40%"></div>
+        <div class="skel" style="height:12px;width:80%"></div>
+        <div class="skel" style="height:12px;width:60%"></div>
+      `;
+      panel.appendChild(card);
+    }
+  }
+
+  function showError(msg) {
+    const panel = document.getElementById('resultsPanel');
+    panel.innerHTML = `<div class="error-card">❌ Error: ${escHtml(msg)}<br/><br/>Make sure the backend is running and the API URL is correct.</div>`;
+  }
+
+  function renderTrace(data) {
+    const panel = document.getElementById('resultsPanel');
+    panel.innerHTML = '';
+
+    // Step 1: Vision
+    if (data.vision) {
+      panel.appendChild(makeVisionCard(data.vision));
+    }
+
+    // Step 2: Manas
+    if (data.manas) {
+      panel.appendChild(makeManasCard(data.manas));
+    }
+
+    // Step 3: Chitta
+    if (data.chitta) {
+      panel.appendChild(makeChittaCard(data.chitta));
+    }
+
+    // Step 4: Buddhi
+    if (data.buddhi) {
+      panel.appendChild(makeBuddhiCard(data.buddhi));
+    }
+
+    // Step 5: Ahamkara
+    if (data.ahamkara) {
+      panel.appendChild(makeAhamkaraCard(data.ahamkara));
+    }
+
+    // Step 6: Sakshi
+    if (data.sakshi) {
+      panel.appendChild(makeSakshiCard(data.sakshi));
+    }
+
+    // Step 7: Final Answer
+    panel.appendChild(makeFinalAnswerCard(data));
+  }
+
+  function makeCard(stepNum, className, title, statusHtml, bodyHtml, startOpen = false) {
+    const id = `card-body-${Math.random().toString(36).slice(2)}`;
+    return htmlEl(`
+      <div class="trace-card ${className}">
+        <div class="card-header" onclick="toggleCard('${id}', this)">
+          <span class="step-badge">STEP ${stepNum}</span>
+          <span class="card-title">${title}</span>
+          ${statusHtml}
+          <span class="card-chevron ${startOpen ? 'open' : ''}">▶</span>
+        </div>
+        <div class="card-body ${startOpen ? 'open' : ''}" id="${id}">
+          ${bodyHtml}
+        </div>
+      </div>
+    `);
+  }
+
+  function toggleCard(id, header) {
+    const body = document.getElementById(id);
+    const chevron = header.querySelector('.card-chevron');
+    body.classList.toggle('open');
+    chevron.classList.toggle('open');
+  }
+
+  function makeVisionCard(v) {
+    const method = v.extraction_method || 'BLIP-2';
+    const err = v.error;
+    const status = err
+      ? `<span class="card-status" style="background:rgba(239,68,68,0.1);color:var(--danger);border:1px solid rgba(239,68,68,0.3);">Error</span>`
+      : `<span class="card-status" style="background:rgba(249,115,22,0.1);color:var(--orange);border:1px solid rgba(249,115,22,0.3);">${method}</span>`;
+
+    const body = err ? `<div style="color:var(--danger)">${escHtml(err)}</div>` : `
+      <div class="med-info-grid">
+        ${medItem('Brand Name', v.brand_name)}
+        ${medItem('Generic Name', v.generic_name)}
+        ${medItem('Strength', v.strength)}
+        ${medItem('Form', v.form)}
+        ${medItem('Expiry Date', v.expiry_date)}
+        ${medItem('Manufacturer', v.manufacturer)}
+      </div>
+      ${v.warnings && v.warnings !== 'Not visible' ? `<div class="flag-item" style="margin-top:0.6rem">⚠️ ${escHtml(v.warnings)}</div>` : ''}
+    `;
+
+    return makeCard(1, 'card-vision', '👁 Vision — BLIP-2 Medicine Analysis', status, body, true);
+  }
+
+  function medItem(label, val) {
+    if (!val || val === 'Not detected' || val === 'Not visible') return '';
+    return `<div class="med-info-item"><div class="med-info-label">${label}</div><div class="med-info-value">${escHtml(val)}</div></div>`;
+  }
+
+  function makeManasCard(m) {
+    const confColor = m.confidence > 0.8 ? 'var(--success)' : m.confidence > 0.6 ? 'var(--warning)' : 'var(--danger)';
+    const status = `<span class="card-status" style="background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.3);">${m.question_type?.toUpperCase()}</span>`;
+    const body = `
+      <div class="kv-grid">
+        <div class="kv-key">Question Type</div><div class="kv-val" style="color:var(--purple);font-weight:600">${m.question_type}</div>
+        <div class="kv-key">Confidence</div><div class="kv-val">${(m.confidence * 100).toFixed(0)}%</div>
+        <div class="kv-key">Rationale</div><div class="kv-val">${escHtml(m.routing_rationale || '')}</div>
+        <div class="kv-key">Entities</div><div class="kv-val">${m.entities?.length ? m.entities.map(e => `<code style="background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:0.75rem">${escHtml(e)}</code>`).join(' ') : '<span style="color:var(--muted)">None</span>'}</div>
+      </div>
+    `;
+    return makeCard(2, 'card-manas', '🧭 Manas — Question Router', status, body, true);
+  }
+
+  function makeChittaCard(c) {
+    const status = `<span class="card-status" style="background:rgba(59,130,246,0.1);color:var(--blue);border:1px solid rgba(59,130,246,0.3);">${c.num_chunks} chunks</span>`;
+    const chunks = (c.retrieved_chunks || []).slice(0, 3);
+    const chunkHtml = chunks.length ? `
+      <div class="chunk-list">
+        ${chunks.map(ch => `
+          <div class="chunk-item">
+            <div class="chunk-meta">
+              <span class="chunk-source">📄 ${escHtml(ch.source || 'unknown')}</span>
+              <span class="chunk-score">${(ch.score * 100).toFixed(0)}% match</span>
+            </div>
+            <div class="chunk-text">${escHtml((ch.content || '').slice(0, 200))}${(ch.content || '').length > 200 ? '…' : ''}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : `<div style="color:var(--muted);font-size:0.82rem">No relevant chunks retrieved from ChromaDB</div>`;
+
+    const body = `
+      <div class="kv-grid" style="margin-bottom:0.75rem">
+        <div class="kv-key">Method</div><div class="kv-val">${c.retrieval_method || 'dense+chromadb'}</div>
+        <div class="kv-key">Total Chunks</div><div class="kv-val">${c.num_chunks}</div>
+      </div>
+      ${chunkHtml}
+    `;
+    return makeCard(3, 'card-chitta', '📚 Chitta — Dense Retrieval + ChromaDB', status, body);
+  }
+
+  function makeBuddhiCard(b) {
+    const passes = [b.pass3_fired ? 'Pass3' : b.pass2_fired ? 'Pass2' : 'Pass1'];
+    const status = `<span class="card-status" style="background:rgba(0,212,170,0.1);color:var(--primary);border:1px solid rgba(0,212,170,0.3);">${passes[0]}</span>`;
+
+    const steps = b.reasoning_steps || [];
+    const stepsHtml = steps.length ? `
+      <div class="reasoning-steps">
+        ${steps.map((s, i) => `
+          <div class="step-item">
+            <div class="step-num">${i + 1}</div>
+            <div>${escHtml(s)}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : '';
+
+    const body = `
+      <div class="kv-grid" style="margin-bottom:0.75rem">
+        <div class="kv-key">Model</div><div class="kv-val" style="font-size:0.75rem">${escHtml(b.model || 'Qwen2.5-7B')}</div>
+        <div class="kv-key">Latency</div><div class="kv-val">${b.latency_s}s</div>
+        <div class="kv-key">Pass 2 (Pramana)</div><div class="kv-val">${b.pass2_fired ? (b.pass2_verified ? '✅ Verified' : '🔧 Corrected') : '—'}</div>
+        <div class="kv-key">Pass 3 (Samsaya)</div><div class="kv-val">${b.pass3_fired ? '⚡ Self-consistency used' : '—'}</div>
+      </div>
+      ${stepsHtml}
+    `;
+    return makeCard(4, 'card-buddhi', '🧠 Buddhi — Qwen2.5-7B Reasoner', status, body, true);
+  }
+
+  function makeAhamkaraCard(a) {
+    const colMap = { HIGH: 'var(--success)', MEDIUM: 'var(--warning)', LOW: 'var(--orange)', VERY_LOW: 'var(--danger)' };
+    const col = colMap[a.confidence_label] || 'var(--muted)';
+    const status = `<span class="card-status" style="background:rgba(245,158,11,0.1);color:${col};border:1px solid ${col}40;">${a.confidence_label}</span>`;
+
+    const pct = Math.round((a.confidence_score || 0) * 100);
+    const body = `
+      <div class="kv-grid" style="margin-bottom:0.75rem">
+        <div class="kv-key">Pass Level</div><div class="kv-val">${escHtml(a.pass_level || '')}</div>
+        <div class="kv-key">Needs Retry</div><div class="kv-val">${a.needs_retry ? '⚠️ Yes' : '✅ No'}</div>
+      </div>
+      <div class="score-bar-wrap">
+        <div class="score-bar-label">
+          <span style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted)">CONFIDENCE SCORE</span>
+          <span style="font-family:'Space Mono',monospace;font-size:0.8rem;color:${col};font-weight:700">${pct}%</span>
+        </div>
+        <div class="score-bar-bg"><div class="score-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${col},${col}88)"></div></div>
+      </div>
+    `;
+    return makeCard(5, 'card-ahamkara', '⚖️ Ahamkara — Confidence Scorer', status, body, true);
+  }
+
+  function makeSakshiCard(s) {
+    const verified = s.verified;
+    const status = verified
+      ? `<span class="card-status" style="background:rgba(16,185,129,0.1);color:var(--success);border:1px solid rgba(16,185,129,0.3);">Verified</span>`
+      : `<span class="card-status" style="background:rgba(245,158,11,0.1);color:var(--warning);border:1px solid rgba(245,158,11,0.3);">Partial</span>`;
+
+    const flags = s.hallucination_flags || [];
+    const flagsHtml = flags.length ? `
+      <div class="flags-list" style="margin-top:0.75rem">
+        <div style="font-size:0.72rem;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:0.3rem">HALLUCINATION FLAGS</div>
+        ${flags.map(f => `<div class="flag-item">⚠️ ${escHtml(f)}</div>`).join('')}
+      </div>
+    ` : `<div style="color:var(--success);font-size:0.82rem;margin-top:0.5rem">✅ No hallucination flags detected</div>`;
+
+    const body = `
+      <div class="kv-grid">
+        <div class="kv-key">Grounded</div><div class="kv-val">${verified ? '✅ Yes' : '⚠️ Partial'}</div>
+        <div class="kv-key">Corrected</div><div class="kv-val">${s.corrected ? `🔧 Yes — ${escHtml(s.correction_note || '')}` : '✅ No correction needed'}</div>
+        <div class="kv-key">Summary</div><div class="kv-val">${escHtml(s.sakshi_summary || '')}</div>
+      </div>
+      ${flagsHtml}
+    `;
+    return makeCard(6, 'card-sakshi', '👁‍🗨 Sakshi — Hallucination Verifier', status, body, true);
+  }
+
+  function makeFinalAnswerCard(data) {
+    const latency = data.total_latency_s ? `<span class="latency-chip">⏱ ${data.total_latency_s}s total</span>` : '';
+    const sources = (data.sources || []).map(s => `<code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:0.72rem;border:1px solid var(--border)">📄 ${escHtml(s)}</code>`).join(' ');
+
+    const answer = (data.final_answer || data.sakshi?.final_answer || '').replace(/\*\*Sources:\*\*.*/s, '').trim();
+
+    const body = `
+      <div class="final-answer-box">${escHtml(answer)}</div>
+      ${sources ? `<div style="margin-top:0.6rem;font-size:0.72rem;color:var(--muted)">Sources: ${sources}</div>` : ''}
+      ${data.sakshi?.medical_disclaimer ? `<div class="disclaimer">${escHtml(data.sakshi.medical_disclaimer)}</div>` : ''}
+    `;
+
+    const status = latency;
+    return makeCard('✓', 'card-answer', '✅ Final Answer', status, body, true);
+  }
+
+  function htmlEl(html) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html.trim();
+    return tpl.content.firstChild;
+  }
+
+  function escHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>
+</body>
+</html>

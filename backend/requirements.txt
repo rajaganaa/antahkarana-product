@@ -1,0 +1,35 @@
+# Antahkarana MedAssist — Backend Dependencies
+# Author: RAJAGANAPATHY M, SRM University
+
+# ── Web Framework ─────────────────────────────────────────────────────────────
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.9
+
+# ── Core ML ───────────────────────────────────────────────────────────────────
+torch>=2.1.0
+transformers>=4.40.0
+accelerate>=0.27.0
+sentence-transformers>=2.6.0
+
+# ── Qwen2.5-7B via vLLM (GPU only — comment out for CPU dev) ─────────────────
+# vllm>=0.4.0
+
+# ── BLIP-2 (included in transformers above) ───────────────────────────────────
+Pillow>=10.0.0
+
+# ── RAG + Vector DB ───────────────────────────────────────────────────────────
+chromadb>=0.5.0
+langchain>=0.2.0
+langchain-community>=0.2.0
+langchain-openai>=0.1.0
+pypdf>=4.0.0
+
+# ── MedAssist Tools ───────────────────────────────────────────────────────────
+requests>=2.31.0
+openai>=1.25.0
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+numpy>=1.24.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0

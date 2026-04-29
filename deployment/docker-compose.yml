@@ -1,0 +1,43 @@
+# deployment/docker-compose.yml — Antahkarana MedAssist
+# Local development with optional GPU
+# Author: RAJAGANAPATHY M, SRM University
+
+version: "3.9"
+
+services:
+  antahkarana-backend:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - USE_VLLM=${USE_VLLM:-false}        # Set true on GCP L4
+      - USE_BLIP2=${USE_BLIP2:-false}      # Set true on GCP L4
+      - MODEL_ID=Qwen/Qwen2.5-7B-Instruct
+      - HF_TOKEN=${HF_TOKEN:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - MEDASSIST_DATA_DIR=/app/data/drug_guides
+      - CHROMA_PATH=/app/data/chroma_db
+      - UPLOAD_DIR=/tmp/antahkarana_uploads
+    volumes:
+      - ../data:/app/data
+      - chroma_data:/app/data/chroma_db
+      - model_cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  chroma_data:
+  model_cache:

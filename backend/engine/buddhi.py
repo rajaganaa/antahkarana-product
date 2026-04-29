@@ -18,9 +18,10 @@ logger = logging.getLogger(__name__)
 # ── vLLM Engine Singleton ────────────────────────────────────────────────────
 _engine = None
 
-MODEL_ID = os.environ.get("MODEL_ID", "Qwen/Qwen2.5-7B-Instruct")
-HF_TOKEN = os.environ.get("HF_TOKEN", "")
-USE_VLLM = os.environ.get("USE_VLLM", "true").lower() == "true"
+MODEL_ID  = os.environ.get("MODEL_ID",  "Qwen/Qwen2.5-7B-Instruct")
+HF_TOKEN  = os.environ.get("HF_TOKEN",  "")
+GROQ_KEY  = os.environ.get("GROQ_API_KEY", "")          # NEW — set in your env
+USE_VLLM  = os.environ.get("USE_VLLM",  "true").lower() == "true"
 
 
 def _get_engine():
@@ -29,7 +30,7 @@ def _get_engine():
         return _engine
 
     if not USE_VLLM:
-        logger.info("[BUDDHI] vLLM disabled — using mock engine for development")
+        logger.info("[BUDDHI] vLLM disabled — using Groq API fallback engine")
         _engine = MockEngine()
         return _engine
 
@@ -57,7 +58,7 @@ def _get_engine():
         _engine = VLLMEngine(llm, tokenizer)
         logger.info("[BUDDHI] vLLM engine ready")
     except Exception as e:
-        logger.warning(f"[BUDDHI] vLLM load failed ({e}) — using mock engine")
+        logger.warning(f"[BUDDHI] vLLM load failed ({e}) — falling back to Groq API engine")
         _engine = MockEngine()
 
     return _engine
@@ -85,19 +86,56 @@ class VLLMEngine:
 
 
 class MockEngine:
-    """Development fallback when vLLM/GPU is not available."""
+    """Uses Groq API as fallback when vLLM/GPU is not available."""
+
     def apply_chat_template(self, system: str, user: str) -> str:
-        return f"[SYSTEM]\n{system}\n[USER]\n{user}\n[ASSISTANT]\n"
+        # Store system/user separately using a delimiter for later parsing in generate()
+        self._system = system
+        self._user   = user
+        return f"{system}|||{user}"
 
     def generate(self, prompt: str, max_tokens: int = 1024, temperature: float = 0.0) -> str:
-        # Returns a plausible mock for development/testing
-        return (
-            "Reasoning: Based on the provided medical context, I can identify relevant information.\n"
-            "Step 1: The query relates to medication information.\n"
-            "Step 2: Cross-referencing with available drug guides.\n"
-            "ANSWER: Please consult the retrieved medical documents for accurate information. "
-            "[Note: Running in mock mode — deploy on GCP L4 GPU for full Qwen2.5-7B reasoning]"
-        )
+        import requests
+        import json
+
+        # Split the prompt back into system + user parts
+        parts  = prompt.split("|||", 1)
+        system = parts[0] if len(parts) > 1 else "You are a medical assistant."
+        user   = parts[1] if len(parts) > 1 else prompt
+
+        api_key = GROQ_KEY or os.environ.get("GROQ_API_KEY", "")
+        if not api_key:
+            return (
+                "ANSWER: Groq API key not configured. "
+                "Set the GROQ_API_KEY environment variable to enable the fallback reasoner."
+            )
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type":  "application/json",
+        }
+        body = {
+            "model": "llama-3.1-8b-instant",
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user",   "content": user},
+            ],
+            "max_tokens":  max_tokens,
+            "temperature": temperature,
+        }
+
+        try:
+            r = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers=headers,
+                json=body,
+                timeout=30,
+            )
+            r.raise_for_status()
+            return r.json()["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            logger.error(f"[BUDDHI/Groq] API call failed: {e}")
+            return f"ANSWER: Error calling Groq API: {e}"
 
 
 # ── Prompt Systems (exact from Antahkarana NLP research) ─────────────────────
@@ -153,7 +191,7 @@ PRAMANA_SYSTEM = (
 class Buddhi:
     """
     Buddhi — Core reasoner with 3-pass architecture.
-    Pass 1 (Tarka): Generate initial answer with structured prompt.
+    Pass 1 (Tarka):   Generate initial answer with structured prompt.
     Pass 2 (Pramana): Verify against context — Sakshi-style correction.
     Pass 3 (Samsaya): Uncertainty resolution via self-consistency.
     """
@@ -183,28 +221,28 @@ class Buddhi:
         # Inject vision context if available
         vision_ctx = ""
         if medicine_info:
-            name = medicine_info.get("generic_name") or medicine_info.get("brand_name", "")
+            name     = medicine_info.get("generic_name") or medicine_info.get("brand_name", "")
             strength = medicine_info.get("strength", "")
-            form = medicine_info.get("form", "")
+            form     = medicine_info.get("form", "")
             if name:
                 vision_ctx = f"[Identified Medicine: {name} {strength} {form}]\n\n"
 
         full_context = f"{vision_ctx}{context_str}" if vision_ctx else context_str
 
         # ── Pass 1: Tarka (Initial Reasoning) ───────────────────────────────
-        system = self._select_system(q_type)
+        system      = self._select_system(q_type)
         user_prompt = f"Medical Context:\n{full_context}\n\nQuestion: {question}"
-        prompt = self.engine.apply_chat_template(system, user_prompt)
+        prompt      = self.engine.apply_chat_template(system, user_prompt)
 
-        pass1_raw = self.engine.generate(prompt, max_tokens=1024)
+        pass1_raw    = self.engine.generate(prompt, max_tokens=1024)
         pass1_answer = self._extract_answer(pass1_raw)
-        pass1_steps = self._extract_reasoning_steps(pass1_raw)
+        pass1_steps  = self._extract_reasoning_steps(pass1_raw)
 
         # ── Pass 2: Pramana (Verification) ──────────────────────────────────
-        pass2_raw = ""
-        pass2_answer = pass1_answer
+        pass2_raw      = ""
+        pass2_answer   = pass1_answer
         pass2_verified = True
-        pass2_fired = False
+        pass2_fired    = False
 
         if full_context.strip() and not self._is_bad_answer(pass1_answer):
             pramana_user = (
@@ -212,13 +250,13 @@ class Buddhi:
                 f"Draft answer: {pass1_answer}\n\n"
                 f"Medical Context:\n{full_context[:2000]}"
             )
-            pramana_prompt = self.engine.apply_chat_template(PRAMANA_SYSTEM, pramana_user)
-            pass2_raw = self.engine.generate(pramana_prompt, max_tokens=512)
+            pramana_prompt  = self.engine.apply_chat_template(PRAMANA_SYSTEM, pramana_user)
+            pass2_raw       = self.engine.generate(pramana_prompt, max_tokens=512)
             pass2_answer, pass2_verified = self._extract_pramana(pass2_raw, pass1_answer)
-            pass2_fired = True
+            pass2_fired     = True
 
         # ── Pass 3: Samsaya (Uncertainty Resolution) ─────────────────────────
-        pass3_fired = False
+        pass3_fired  = False
         final_answer = pass2_answer
 
         if self._is_bad_answer(pass2_answer):
@@ -231,24 +269,24 @@ class Buddhi:
             candidates = [c for c in candidates if not self._is_bad_answer(c)]
             if candidates:
                 from collections import Counter
-                best = Counter(c.lower() for c in candidates).most_common(1)[0][0]
+                best         = Counter(c.lower() for c in candidates).most_common(1)[0][0]
                 final_answer = next((c for c in candidates if c.lower() == best), candidates[0])
-                pass3_fired = True
+                pass3_fired  = True
 
         elapsed = round(time.time() - t0, 3)
 
         return {
             "reasoning_steps": pass1_steps,
-            "pass1_raw": pass1_raw,
-            "pass1_answer": pass1_answer,
-            "pass2_raw": pass2_raw if pass2_fired else None,
-            "pass2_answer": pass2_answer,
-            "pass2_verified": pass2_verified,
-            "pass2_fired": pass2_fired,
-            "pass3_fired": pass3_fired,
-            "draft_answer": final_answer,
-            "latency_s": elapsed,
-            "model": MODEL_ID,
+            "pass1_raw":       pass1_raw,
+            "pass1_answer":    pass1_answer,
+            "pass2_raw":       pass2_raw if pass2_fired else None,
+            "pass2_answer":    pass2_answer,
+            "pass2_verified":  pass2_verified,
+            "pass2_fired":     pass2_fired,
+            "pass3_fired":     pass3_fired,
+            "draft_answer":    final_answer,
+            "latency_s":       elapsed,
+            "model":           MODEL_ID,
         }
 
     def _select_system(self, q_type: str) -> str:
@@ -273,24 +311,27 @@ class Buddhi:
     def _extract_reasoning_steps(self, raw: str) -> List[str]:
         steps = []
         # Extract Reasoning: block
-        m = re.search(r'Reasoning\s*:\s*(.+?)(?:ANSWER|WARNING|$)', raw, re.IGNORECASE | re.DOTALL)
+        m = re.search(
+            r'Reasoning\s*:\s*(.+?)(?:ANSWER|WARNING|$)',
+            raw, re.IGNORECASE | re.DOTALL
+        )
         if m:
             steps_text = m.group(1).strip()
             # Split on numbered steps
             numbered = re.split(r'\n(?=Step\s*\d+|^\d+\.)', steps_text, flags=re.MULTILINE)
-            steps = [s.strip() for s in numbered if s.strip()]
+            steps    = [s.strip() for s in numbered if s.strip()]
         if not steps:
             steps = [l.strip() for l in raw.split("\n") if l.strip()][:5]
         return steps
 
     def _extract_pramana(self, raw: str, draft: str):
-        supported_m = re.search(r'Supported\s*:\s*(yes|no)', raw, re.IGNORECASE)
-        revised_m = re.search(r'Revised answer\s*:\s*(.+?)(?:\n|$)', raw, re.IGNORECASE)
+        supported_m = re.search(r'Supported\s*:\s*(yes|no)',        raw, re.IGNORECASE)
+        revised_m   = re.search(r'Revised answer\s*:\s*(.+?)(?:\n|$)', raw, re.IGNORECASE)
 
         if revised_m and supported_m and supported_m.group(1).lower() == "no":
             revised = revised_m.group(1).strip()
             if revised and not self._is_bad_answer(revised):
-                return revised, False  # (corrected answer, was_verified=False means it was wrong)
+                return revised, False   # (corrected answer, was_verified=False → it was wrong)
         return draft, True
 
     APOLOGY_PATTERNS = [

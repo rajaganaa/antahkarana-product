@@ -18,7 +18,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 USE_BLIP2 = os.environ.get("USE_BLIP2", "true").lower() == "true"
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_API_KEY = os.environ.get("GITHUB_TOKEN", "")
 
 # ── BLIP-2 Singleton ─────────────────────────────────────────────────────────
 _blip2_processor = None
@@ -166,7 +166,10 @@ def extract_medicine_info_gpt4v(image_path: str) -> Dict:
     t0 = time.time()
     try:
         from openai import OpenAI
-        client = OpenAI(api_key=OPENAI_API_KEY)
+        client = OpenAI(
+            base_url="https://models.inference.ai.azure.com",
+            api_key=OPENAI_API_KEY
+        )
 
         with open(image_path, "rb") as f:
             image_data = base64.b64encode(f.read()).decode("utf-8")
@@ -193,7 +196,7 @@ Return ONLY valid JSON:
 Use "Not visible" for fields you cannot read. For dates, write exactly as shown."""
 
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o",   # GitHub Models supports this ✅
             messages=[{
                 "role": "user",
                 "content": [

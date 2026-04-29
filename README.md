@@ -2,7 +2,7 @@
 
 **Author:** RAJAGANAPATHY M, SRM University  
 **Live Demo:** https://rajaganaa.github.io/medassist-frontend  
-**Backend:** https://medassist-api-13ls6v.azurewebsites.net/api  
+**Backend:** http://antahkarana-api.centralindia.azurecontainer.io:8000  
 
 ---
 

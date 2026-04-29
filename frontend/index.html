@@ -3,941 +3,943 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Antahkarana — MedAssist AI</title>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <title>Antahkarana MedAssist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet" />
   <style>
+    /* ── Variables ────────────────────────────────────────────────── */
     :root {
-      --primary: #00d4aa;
-      --primary-dark: #00a885;
-      --bg: #080c18;
-      --surface: #0f1824;
-      --surface2: #161f30;
-      --border: #1e2d3d;
-      --text: #e2e8f0;
-      --muted: #64748b;
-      --success: #10b981;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --purple: #8b5cf6;
-      --blue: #3b82f6;
-      --orange: #f97316;
-      --teal: #14b8a6;
+      --bg0: #080c14;
+      --bg1: #0d1320;
+      --bg2: #111827;
+      --bg3: #1a2236;
+      --bg4: #232e45;
+      --border: rgba(99,120,180,0.18);
+      --border-hi: rgba(99,120,180,0.38);
+      --teal: #0fd6c2;
+      --teal-dim: rgba(15,214,194,0.12);
+      --teal-glow: rgba(15,214,194,0.25);
+      --indigo: #818cf8;
+      --indigo-dim: rgba(129,140,248,0.12);
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --green: #34d399;
+      --txt0: #e8edf8;
+      --txt1: #a0aec8;
+      --txt2: #5a6a88;
+      --r: 12px;
+      --r-lg: 18px;
     }
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      background: var(--bg);
-      color: var(--text);
       font-family: 'DM Sans', sans-serif;
-      min-height: 100vh;
-      overflow-x: hidden;
+      background: var(--bg0);
+      color: var(--txt0);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
     }
 
-    /* ── Header ── */
-    header {
-      background: linear-gradient(135deg, #080c18 0%, #0f1824 60%, #0a1520 100%);
-      border-bottom: 1px solid var(--border);
-      padding: 1.5rem 2rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      position: relative;
-    }
-    header::after {
+    /* subtle grid overlay */
+    body::before {
       content: '';
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--primary), transparent);
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(99,120,180,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,120,180,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
     }
-    .logo-icon {
-      width: 48px; height: 48px;
-      background: linear-gradient(135deg, var(--primary), var(--purple));
-      border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.5rem;
-      flex-shrink: 0;
-    }
-    .logo-text h1 {
-      font-family: 'Space Mono', monospace;
-      font-size: 1.4rem;
-      color: var(--primary);
-      letter-spacing: -0.5px;
-    }
-    .logo-text p {
-      font-size: 0.78rem;
-      color: var(--muted);
-      margin-top: 2px;
-    }
-    .header-badges {
-      margin-left: auto;
+
+    /* ── Layout ──────────────────────────────────────────────────── */
+    .shell {
       display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-    .badge {
-      font-size: 0.7rem;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-family: 'Space Mono', monospace;
-      font-weight: 700;
-    }
-    .badge-green { background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
-    .badge-purple { background: rgba(139,92,246,0.15); color: var(--purple); border: 1px solid rgba(139,92,246,0.3); }
-    .badge-blue { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.3); }
-
-    /* ── Main layout ── */
-    .container {
-      max-width: 1300px;
-      margin: 0 auto;
-      padding: 2rem;
-      display: grid;
-      grid-template-columns: 420px 1fr;
-      gap: 2rem;
-      align-items: start;
-    }
-
-    /* ── Input Panel ── */
-    .input-panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 1.5rem;
-      position: sticky;
-      top: 1rem;
-    }
-    .panel-title {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.75rem;
-      color: var(--primary);
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 1.2rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .panel-title::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
-
-    /* Image upload */
-    .upload-zone {
-      border: 2px dashed var(--border);
-      border-radius: 12px;
-      padding: 1.5rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-bottom: 1rem;
-      position: relative;
-    }
-    .upload-zone:hover { border-color: var(--primary); background: rgba(0,212,170,0.04); }
-    .upload-zone.has-image { border-color: var(--success); border-style: solid; }
-    .upload-icon { font-size: 2rem; margin-bottom: 0.5rem; }
-    .upload-text { font-size: 0.82rem; color: var(--muted); }
-    .upload-subtext { font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; }
-    #fileInput { display: none; }
-    #imagePreview {
-      max-width: 100%;
-      max-height: 180px;
-      border-radius: 8px;
-      object-fit: contain;
-      display: none;
-    }
-
-    /* Question input */
-    textarea {
       width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      color: var(--text);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 0.9rem;
-      padding: 0.8rem 1rem;
-      resize: vertical;
-      min-height: 100px;
-      margin-bottom: 1rem;
-      transition: border-color 0.2s;
+      height: 100vh;
+      position: relative;
+      z-index: 1;
     }
-    textarea:focus { outline: none; border-color: var(--primary); }
-    textarea::placeholder { color: var(--muted); }
 
-    /* Example questions */
-    .examples-label {
-      font-size: 0.72rem;
-      color: var(--muted);
-      margin-bottom: 0.5rem;
-      font-family: 'Space Mono', monospace;
-    }
-    .example-pills {
+    /* ── Sidebar ─────────────────────────────────────────────────── */
+    .sidebar {
+      width: 300px;
+      min-width: 300px;
+      background: var(--bg1);
+      border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      gap: 0.4rem;
-      margin-bottom: 1rem;
+      padding: 24px 20px;
+      gap: 24px;
+      overflow-y: auto;
     }
-    .pill {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.45rem 0.75rem;
-      font-size: 0.78rem;
-      color: var(--muted);
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--teal), var(--indigo));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 0 16px var(--teal-glow);
+    }
+
+    .brand-icon svg { width: 22px; height: 22px; }
+
+    .brand-text h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      background: linear-gradient(120deg, var(--teal), var(--indigo));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .brand-text p {
+      font-size: 0.7rem;
+      color: var(--txt2);
+      margin-top: 2px;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Upload Zone ─────────────────────────────────────────────── */
+    .section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--txt2);
+      margin-bottom: 8px;
+    }
+
+    .upload-zone {
+      border: 1.5px dashed var(--border-hi);
+      border-radius: var(--r);
+      padding: 20px 14px;
+      text-align: center;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: all .2s;
+      background: var(--bg2);
+      position: relative;
+      overflow: hidden;
+    }
+    .upload-zone:hover { border-color: var(--teal); background: var(--teal-dim); }
+    .upload-zone.drag-over { border-color: var(--teal); background: var(--teal-dim); transform: scale(1.01); }
+    .upload-zone.has-image { border-color: var(--green); border-style: solid; }
+
+    .upload-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+
+    .upload-icon {
+      width: 36px; height: 36px;
+      margin: 0 auto 8px;
+      color: var(--teal);
+      transition: color .2s;
+    }
+    .upload-zone:hover .upload-icon { color: var(--teal); }
+    .upload-zone.has-image .upload-icon { color: var(--green); }
+
+    .upload-zone p { font-size: 0.78rem; color: var(--txt1); }
+    .upload-zone small { font-size: 0.68rem; color: var(--txt2); margin-top: 3px; display: block; }
+
+    #img-preview {
+      display: none;
+      width: 100%;
+      max-height: 130px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    .has-image #img-preview { display: block; }
+
+    /* ── Quick Actions ───────────────────────────────────────────── */
+    .quick-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .qa-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      cursor: pointer;
+      transition: all .18s;
       text-align: left;
     }
-    .pill:hover { border-color: var(--primary); color: var(--text); background: rgba(0,212,170,0.04); }
-
-    /* Submit button */
-    button.submit-btn {
-      width: 100%;
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      color: #000;
-      border: none;
-      border-radius: 10px;
-      padding: 0.85rem;
-      font-family: 'Space Mono', monospace;
-      font-size: 0.85rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
-      letter-spacing: 0.5px;
+    .qa-btn:hover {
+      background: var(--bg4);
+      border-color: var(--teal);
+      transform: translateX(3px);
     }
-    button.submit-btn:hover { opacity: 0.9; transform: translateY(-1px); }
-    button.submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .qa-icon {
+      width: 28px; height: 28px;
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 0.85rem;
+    }
+    .qa-btn span { font-size: 0.8rem; color: var(--txt1); line-height: 1.3; }
+    .qa-btn:hover span { color: var(--txt0); }
 
-    /* API URL */
-    .api-config {
-      margin-top: 1rem;
-      padding-top: 1rem;
+    /* ── Pipeline Steps (sidebar bottom) ────────────────────────── */
+    .pipeline {
+      margin-top: auto;
+      padding-top: 16px;
       border-top: 1px solid var(--border);
     }
-    .api-config label { font-size: 0.72rem; color: var(--muted); display: block; margin-bottom: 0.3rem; }
-    .api-config input {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-family: 'Space Mono', monospace;
-      font-size: 0.72rem;
-      padding: 0.5rem 0.75rem;
-    }
-    .api-config input:focus { outline: none; border-color: var(--primary); }
-
-    /* ── Results Panel ── */
-    .results-panel { display: flex; flex-direction: column; gap: 1rem; }
-
-    /* Welcome state */
-    .welcome-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 3rem 2rem;
-      text-align: center;
-    }
-    .welcome-icon { font-size: 3rem; margin-bottom: 1rem; }
-    .welcome-title {
-      font-family: 'Space Mono', monospace;
-      font-size: 1.1rem;
-      color: var(--primary);
-      margin-bottom: 0.5rem;
-    }
-    .welcome-text { font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
-
-    /* Pipeline overview */
     .pipeline-steps {
       display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-top: 1.5rem;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 8px;
     }
-    .pipeline-step {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.4rem 0.8rem;
-      font-size: 0.72rem;
-      font-family: 'Space Mono', monospace;
-      color: var(--muted);
-    }
-
-    /* ── Reasoning Trace Cards ── */
-    .trace-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      overflow: hidden;
-      animation: slideIn 0.4s ease;
-      opacity: 0;
-      animation-fill-mode: forwards;
-    }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(12px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    .trace-card:nth-child(1) { animation-delay: 0.05s; }
-    .trace-card:nth-child(2) { animation-delay: 0.15s; }
-    .trace-card:nth-child(3) { animation-delay: 0.25s; }
-    .trace-card:nth-child(4) { animation-delay: 0.35s; }
-    .trace-card:nth-child(5) { animation-delay: 0.45s; }
-    .trace-card:nth-child(6) { animation-delay: 0.55s; }
-    .trace-card:nth-child(7) { animation-delay: 0.65s; }
-
-    .card-header {
+    .ps {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      padding: 0.85rem 1.2rem;
-      border-bottom: 1px solid var(--border);
-      cursor: pointer;
-      user-select: none;
+      gap: 8px;
+      padding: 5px 6px;
+      border-radius: 7px;
+      font-size: 0.73rem;
+      color: var(--txt2);
     }
-    .card-header:hover { background: rgba(255,255,255,0.02); }
-    .step-badge {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.65rem;
-      padding: 2px 8px;
-      border-radius: 20px;
-      font-weight: 700;
-    }
-    .card-title {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.8rem;
-      font-weight: 700;
-      flex: 1;
-    }
-    .card-status {
-      font-size: 0.7rem;
-      padding: 2px 8px;
-      border-radius: 20px;
-      font-family: 'Space Mono', monospace;
-    }
-    .card-chevron {
-      font-size: 0.7rem;
-      color: var(--muted);
-      transition: transform 0.2s;
-    }
-    .card-chevron.open { transform: rotate(90deg); }
-
-    .card-body {
-      padding: 1.2rem;
-      border-top: 0;
-      display: none;
-    }
-    .card-body.open { display: block; }
-
-    /* Card color themes */
-    .card-vision .step-badge { background: rgba(249,115,22,0.15); color: var(--orange); border: 1px solid rgba(249,115,22,0.3); }
-    .card-vision .card-title { color: var(--orange); }
-    .card-manas .step-badge { background: rgba(139,92,246,0.15); color: var(--purple); border: 1px solid rgba(139,92,246,0.3); }
-    .card-manas .card-title { color: var(--purple); }
-    .card-chitta .step-badge { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.3); }
-    .card-chitta .card-title { color: var(--blue); }
-    .card-buddhi .step-badge { background: rgba(0,212,170,0.15); color: var(--primary); border: 1px solid rgba(0,212,170,0.3); }
-    .card-buddhi .card-title { color: var(--primary); }
-    .card-ahamkara .step-badge { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
-    .card-ahamkara .card-title { color: var(--warning); }
-    .card-sakshi .step-badge { background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
-    .card-sakshi .card-title { color: var(--success); }
-    .card-answer .step-badge { background: rgba(0,212,170,0.2); color: var(--primary); border: 1px solid var(--primary); }
-    .card-answer .card-title { color: var(--primary); }
-
-    /* Data display */
-    .kv-grid {
-      display: grid;
-      grid-template-columns: 140px 1fr;
-      gap: 0.5rem 1rem;
-      font-size: 0.82rem;
-    }
-    .kv-key { color: var(--muted); font-family: 'Space Mono', monospace; font-size: 0.72rem; }
-    .kv-val { color: var(--text); word-break: break-word; }
-
-    .chunk-list { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.5rem; }
-    .chunk-item {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.7rem;
-      font-size: 0.78rem;
-    }
-    .chunk-meta {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 0.3rem;
-      font-family: 'Space Mono', monospace;
-    }
-    .chunk-source { color: var(--primary); font-size: 0.68rem; }
-    .chunk-score {
-      font-size: 0.68rem;
-      padding: 1px 6px;
-      border-radius: 10px;
-      background: rgba(0,212,170,0.1);
-      color: var(--primary);
-    }
-    .chunk-text { color: var(--muted); line-height: 1.5; }
-
-    .reasoning-steps { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
-    .step-item {
-      display: flex;
-      gap: 0.75rem;
-      font-size: 0.82rem;
-      line-height: 1.5;
-    }
-    .step-num {
-      width: 22px;
-      height: 22px;
+    .ps.active { background: var(--teal-dim); color: var(--teal); }
+    .ps-dot {
+      width: 7px; height: 7px;
       border-radius: 50%;
-      background: rgba(0,212,170,0.15);
-      border: 1px solid rgba(0,212,170,0.3);
+      background: var(--bg4);
+      flex-shrink: 0;
+    }
+    .ps.active .ps-dot { background: var(--teal); box-shadow: 0 0 6px var(--teal); }
+    .ps-name { font-family: 'DM Mono', monospace; font-size: 0.65rem; }
+
+    /* ── Main Chat Area ──────────────────────────────────────────── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: var(--bg0);
+    }
+
+    .topbar {
+      padding: 16px 28px;
+      border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
-      justify-content: center;
-      font-size: 0.65rem;
-      color: var(--primary);
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-
-    .score-bar-wrap { margin-top: 0.75rem; }
-    .score-bar-label {
-      display: flex;
       justify-content: space-between;
-      font-size: 0.75rem;
-      margin-bottom: 0.3rem;
-    }
-    .score-bar-bg {
-      background: var(--surface2);
-      border-radius: 20px;
-      height: 8px;
-      overflow: hidden;
-    }
-    .score-bar-fill {
-      height: 100%;
-      border-radius: 20px;
-      transition: width 0.8s ease;
-      background: linear-gradient(90deg, var(--primary), var(--success));
+      background: var(--bg1);
+      flex-shrink: 0;
     }
 
-    .flags-list { display: flex; flex-direction: column; gap: 0.4rem; }
-    .flag-item {
+    .topbar-left h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--txt0);
+    }
+    .topbar-left p { font-size: 0.72rem; color: var(--txt2); margin-top: 1px; }
+
+    .status-pill {
       display: flex;
-      gap: 0.5rem;
-      font-size: 0.78rem;
-      color: var(--warning);
-      background: rgba(245,158,11,0.08);
-      border: 1px solid rgba(245,158,11,0.2);
-      border-radius: 6px;
-      padding: 0.4rem 0.6rem;
-    }
-
-    /* Final answer */
-    .final-answer-box {
-      background: linear-gradient(135deg, rgba(0,212,170,0.08), rgba(139,92,246,0.05));
-      border: 1px solid rgba(0,212,170,0.3);
-      border-radius: 12px;
-      padding: 1.2rem;
-      font-size: 0.9rem;
-      line-height: 1.7;
-      color: var(--text);
-      white-space: pre-wrap;
-    }
-
-    .disclaimer {
-      margin-top: 0.75rem;
-      font-size: 0.75rem;
-      color: var(--warning);
-      background: rgba(245,158,11,0.06);
-      border: 1px solid rgba(245,158,11,0.2);
-      border-radius: 8px;
-      padding: 0.5rem 0.75rem;
-    }
-
-    /* Loading skeleton */
-    .loading-card {
-      background: var(--surface);
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      background: var(--bg3);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 1.2rem;
-      animation: pulse 1.5s ease-in-out infinite;
+      border-radius: 99px;
+      font-size: 0.7rem;
+      color: var(--txt1);
+      font-family: 'DM Mono', monospace;
+    }
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse 2s infinite;
     }
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.6; }
-    }
-    .skel { background: var(--border); border-radius: 4px; margin-bottom: 0.5rem; }
-
-    /* Error */
-    .error-card {
-      background: rgba(239,68,68,0.08);
-      border: 1px solid rgba(239,68,68,0.3);
-      border-radius: 12px;
-      padding: 1.2rem;
-      color: var(--danger);
-      font-size: 0.85rem;
+      0%,100% { opacity: 1; } 50% { opacity: 0.4; }
     }
 
-    /* Latency chip */
-    .latency-chip {
-      font-size: 0.68rem;
-      font-family: 'Space Mono', monospace;
-      color: var(--muted);
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 2px 8px;
+    /* ── Messages ────────────────────────────────────────────────── */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      scroll-behavior: smooth;
     }
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 99px; }
 
-    /* Medicine info grid */
-    .med-info-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 0.6rem;
-      margin-top: 0.5rem;
-    }
-    .med-info-item {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.5rem 0.75rem;
-    }
-    .med-info-label { font-size: 0.65rem; color: var(--muted); font-family: 'Space Mono', monospace; margin-bottom: 2px; }
-    .med-info-value { font-size: 0.82rem; color: var(--text); }
-
-    /* Footer */
-    footer {
+    /* welcome */
+    .welcome {
+      margin: auto;
       text-align: center;
-      padding: 2rem;
-      font-size: 0.75rem;
-      color: var(--muted);
-      border-top: 1px solid var(--border);
-      margin-top: 2rem;
+      max-width: 480px;
+      animation: fadeUp .5s ease both;
     }
-    footer span { color: var(--primary); }
+    .welcome-orb {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: conic-gradient(from 180deg, var(--teal), var(--indigo), var(--teal));
+      margin: 0 auto 20px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 40px var(--teal-glow);
+      animation: spin 8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .welcome-orb-inner {
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      background: var(--bg0);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.8rem;
+    }
+    .welcome h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .welcome p { font-size: 0.85rem; color: var(--txt1); line-height: 1.6; }
 
-    @media (max-width: 900px) {
-      .container { grid-template-columns: 1fr; }
-      .input-panel { position: static; }
+    /* message rows */
+    .msg {
+      display: flex;
+      gap: 12px;
+      max-width: 820px;
+      animation: fadeUp .3s ease both;
+    }
+    .msg.user { flex-direction: row-reverse; margin-left: auto; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg-avatar {
+      width: 34px; height: 34px;
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 0.9rem;
+    }
+    .msg.bot .msg-avatar { background: linear-gradient(135deg, var(--teal), var(--indigo)); }
+    .msg.user .msg-avatar { background: var(--bg4); border: 1px solid var(--border); }
+
+    .msg-body { max-width: calc(100% - 46px); }
+
+    .msg-meta {
+      font-size: 0.65rem;
+      color: var(--txt2);
+      margin-bottom: 5px;
+      font-family: 'DM Mono', monospace;
+    }
+    .msg.user .msg-meta { text-align: right; }
+
+    .msg-bubble {
+      padding: 13px 16px;
+      border-radius: var(--r);
+      font-size: 0.85rem;
+      line-height: 1.65;
+    }
+    .msg.bot .msg-bubble {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--txt0);
+      border-top-left-radius: 4px;
+    }
+    .msg.user .msg-bubble {
+      background: linear-gradient(135deg, rgba(15,214,194,0.18), rgba(129,140,248,0.18));
+      border: 1px solid rgba(15,214,194,0.25);
+      color: var(--txt0);
+      border-top-right-radius: 4px;
+    }
+
+    .msg-bubble strong { color: var(--teal); }
+    .msg-bubble em { color: var(--indigo); font-style: normal; }
+
+    /* disclaimer badge */
+    .disclaimer {
+      margin-top: 10px;
+      padding: 7px 11px;
+      background: rgba(251,191,36,0.07);
+      border: 1px solid rgba(251,191,36,0.22);
+      border-radius: 8px;
+      font-size: 0.7rem;
+      color: var(--amber);
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    /* confidence badge */
+    .conf-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 10px;
+      padding: 4px 9px;
+      border-radius: 99px;
+      font-size: 0.68rem;
+      font-family: 'DM Mono', monospace;
+    }
+    .conf-high { background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3); color: var(--green); }
+    .conf-med  { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); color: var(--amber); }
+    .conf-low  { background: rgba(251,113,133,0.1); border: 1px solid rgba(251,113,133,0.3); color: var(--rose); }
+
+    /* typing */
+    .typing {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 0 4px;
+    }
+    .typing.visible { display: flex; }
+    .typing-dots {
+      display: flex; gap: 4px;
+      padding: 10px 14px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      border-top-left-radius: 4px;
+    }
+    .typing-dots span {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--teal);
+      animation: blink 1.2s infinite;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: .2s; }
+    .typing-dots span:nth-child(3) { animation-delay: .4s; }
+    @keyframes blink {
+      0%,80%,100% { opacity: .2; transform: scale(1); }
+      40% { opacity: 1; transform: scale(1.15); }
+    }
+
+    /* ── Input Bar ───────────────────────────────────────────────── */
+    .input-bar {
+      padding: 16px 28px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--bg1);
+      flex-shrink: 0;
+    }
+
+    .input-wrap {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      background: var(--bg2);
+      border: 1.5px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 10px 12px;
+      transition: border-color .2s;
+    }
+    .input-wrap:focus-within { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-dim); }
+
+    #chat-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--txt0);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.88rem;
+      resize: none;
+      max-height: 120px;
+      line-height: 1.5;
+      padding: 2px 0;
+    }
+    #chat-input::placeholder { color: var(--txt2); }
+
+    .send-btn {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--teal), var(--indigo));
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: all .18s;
+      box-shadow: 0 2px 12px var(--teal-glow);
+    }
+    .send-btn:hover { transform: scale(1.07); box-shadow: 0 4px 18px var(--teal-glow); }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .send-btn svg { width: 18px; height: 18px; color: white; }
+
+    .input-hint {
+      margin-top: 7px;
+      font-size: 0.68rem;
+      color: var(--txt2);
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* ── Error toast ─────────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(251,113,133,0.15);
+      border: 1px solid rgba(251,113,133,0.4);
+      color: var(--rose);
+      padding: 10px 18px;
+      border-radius: 99px;
+      font-size: 0.8rem;
+      opacity: 0;
+      transition: all .3s;
+      pointer-events: none;
+      z-index: 999;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Scrollbar for sidebar ───────────────────────────────────── */
+    .sidebar::-webkit-scrollbar { width: 3px; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--bg4); }
+
+    /* ── Sources chips ───────────────────────────────────────────── */
+    .sources {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .src-chip {
+      padding: 3px 9px;
+      background: var(--indigo-dim);
+      border: 1px solid rgba(129,140,248,0.2);
+      border-radius: 99px;
+      font-size: 0.65rem;
+      color: var(--indigo);
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* image attached pill in input */
+    .img-pill {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      padding: 4px 10px;
+      background: rgba(52,211,153,0.1);
+      border: 1px solid rgba(52,211,153,0.3);
+      border-radius: 99px;
+      font-size: 0.7rem;
+      color: var(--green);
+      width: fit-content;
+    }
+    .img-pill.visible { display: flex; }
+    .img-pill button {
+      background: none; border: none; cursor: pointer;
+      color: var(--green); font-size: 0.8rem; line-height: 1; padding: 0; margin: 0;
     }
   </style>
 </head>
 <body>
+<div class="shell">
 
-<!-- HEADER -->
-<header>
-  <div class="logo-icon">🧠</div>
-  <div class="logo-text">
-    <h1>ANTAHKARANA</h1>
-    <p>5-Component Medical Reasoning Engine · RAJAGANAPATHY M, SRM University</p>
-  </div>
-  <div class="header-badges">
-    <span class="badge badge-green">Qwen2.5-7B</span>
-    <span class="badge badge-purple">BLIP-2</span>
-    <span class="badge badge-blue">ChromaDB RAG</span>
-  </div>
-</header>
-
-<!-- MAIN -->
-<div class="container">
-
-  <!-- INPUT PANEL -->
-  <div class="input-panel">
-    <div class="panel-title">🔬 Query Input</div>
+  <!-- ── Sidebar ─────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>
+          <path d="M12 6v6l4 2"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>Antahkarana</h1>
+        <p>MedAssist · v1.0</p>
+      </div>
+    </div>
 
     <!-- Image Upload -->
-    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-      <img id="imagePreview" src="" alt="Medicine image" />
-      <div id="uploadPlaceholder">
-        <div class="upload-icon">💊</div>
-        <div class="upload-text">Upload medicine image</div>
-        <div class="upload-subtext">BLIP-2 will extract drug name, strength, expiry date</div>
-      </div>
-      <input type="file" id="fileInput" accept="image/*" onchange="handleImageUpload(event)" />
-    </div>
-    <button onclick="clearImage()" id="clearBtn" style="display:none;width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:0.4rem;font-size:0.75rem;cursor:pointer;margin-bottom:0.75rem;">✕ Remove image</button>
-
-    <!-- Question -->
-    <textarea id="questionInput" placeholder="Ask anything about medications...
-
-E.g.: What is the maximum dose of paracetamol for adults?
-E.g.: Is this medicine expired?
-E.g.: What are the side effects of ibuprofen?"></textarea>
-
-    <!-- Examples -->
-    <div class="examples-label">EXAMPLE QUESTIONS</div>
-    <div class="example-pills">
-      <div class="pill" onclick="setQ(this)">What is the maximum dose of paracetamol for adults?</div>
-      <div class="pill" onclick="setQ(this)">Calculate dosage for a 25kg child — amoxicillin</div>
-      <div class="pill" onclick="setQ(this)">What are the side effects of ibuprofen?</div>
-      <div class="pill" onclick="setQ(this)">Is metformin safe for kidney disease patients?</div>
-      <div class="pill" onclick="setQ(this)">What are FDA-reported adverse reactions for cetirizine?</div>
-    </div>
-
-    <button class="submit-btn" id="submitBtn" onclick="runPipeline()">
-      ⚡ RUN ANTAHKARANA PIPELINE
-    </button>
-
-    <!-- API Config -->
-    <div class="api-config">
-      <label>BACKEND API URL</label>
-      <input type="text" id="apiUrl" value="http://antahkarana-api.centralindia.azurecontainer.io:8000" placeholder="http://localhost:8000" />
-    </div>
-  </div>
-
-  <!-- RESULTS PANEL -->
-  <div class="results-panel" id="resultsPanel">
-
-    <!-- Welcome -->
-    <div class="welcome-card" id="welcomeCard">
-      <div class="welcome-icon">🔮</div>
-      <div class="welcome-title">Antahkarana Reasoning Engine</div>
-      <div class="welcome-text">
-        Upload a medicine image and ask a question.<br/>
-        The 5-component pipeline will reason through your query step by step<br/>
-        and show you the complete reasoning trace.
-      </div>
-      <div class="pipeline-steps">
-        <div class="pipeline-step">👁 Vision</div>
-        <div class="pipeline-step">🧭 Manas</div>
-        <div class="pipeline-step">📚 Chitta</div>
-        <div class="pipeline-step">🧠 Buddhi</div>
-        <div class="pipeline-step">⚖️ Ahamkara</div>
-        <div class="pipeline-step">👁‍🗨 Sakshi</div>
-        <div class="pipeline-step">✅ Answer</div>
+    <div>
+      <div class="section-label">Medicine Image</div>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" accept="image/*" />
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="3"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+        </div>
+        <p>Drop medicine image here</p>
+        <small>JPG, PNG, WEBP — click or drag</small>
+        <img id="img-preview" alt="preview" />
       </div>
     </div>
 
-  </div>
+    <!-- Quick Actions -->
+    <div>
+      <div class="section-label">Quick Actions</div>
+      <div class="quick-list">
+        <button class="qa-btn" onclick="ask('What is the dosage for this medicine?')">
+          <div class="qa-icon" style="background:rgba(15,214,194,0.12); color:var(--teal)">💊</div>
+          <span>Dosage information</span>
+        </button>
+        <button class="qa-btn" onclick="ask('What are the side effects and warnings?')">
+          <div class="qa-icon" style="background:rgba(251,113,133,0.12); color:var(--rose)">⚠️</div>
+          <span>Side effects & warnings</span>
+        </button>
+        <button class="qa-btn" onclick="ask('Is this medicine expired?')">
+          <div class="qa-icon" style="background:rgba(251,191,36,0.12); color:var(--amber)">📅</div>
+          <span>Check expiry date</span>
+        </button>
+        <button class="qa-btn" onclick="ask('What drug interactions should I know about?')">
+          <div class="qa-icon" style="background:rgba(129,140,248,0.12); color:var(--indigo)">🔬</div>
+          <span>Drug interactions</span>
+        </button>
+        <button class="qa-btn" onclick="ask('Show FDA adverse event reports for this drug')">
+          <div class="qa-icon" style="background:rgba(52,211,153,0.12); color:var(--green)">📊</div>
+          <span>FDA adverse events</span>
+        </button>
+        <button class="qa-btn" onclick="ask('What are the storage instructions for this medicine?')">
+          <div class="qa-icon" style="background:rgba(99,120,180,0.12); color:var(--txt1)">🏥</div>
+          <span>Storage instructions</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Pipeline indicator -->
+    <div class="pipeline">
+      <div class="section-label">Reasoning Pipeline</div>
+      <div class="pipeline-steps" id="pipeline-steps">
+        <div class="ps" data-step="vision"><div class="ps-dot"></div><span class="ps-name">BLIP-2 Vision</span></div>
+        <div class="ps" data-step="manas"><div class="ps-dot"></div><span class="ps-name">Manas · Router</span></div>
+        <div class="ps" data-step="chitta"><div class="ps-dot"></div><span class="ps-name">Chitta · Retrieval</span></div>
+        <div class="ps" data-step="buddhi"><div class="ps-dot"></div><span class="ps-name">Buddhi · Qwen2.5</span></div>
+        <div class="ps" data-step="ahamkara"><div class="ps-dot"></div><span class="ps-name">Ahamkara · Confidence</span></div>
+        <div class="ps" data-step="sakshi"><div class="ps-dot"></div><span class="ps-name">Sakshi · Verify</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ────────────────────────────────────────────────── -->
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <h2>Antahkarana MedAssist</h2>
+        <p>Intelligent pharmaceutical reasoning · Qwen2.5-7B + BLIP-2 + ChromaDB RAG</p>
+      </div>
+      <div class="status-pill">
+        <div class="status-dot"></div>
+        <span id="status-label">Connected</span>
+      </div>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="welcome" id="welcome">
+        <div class="welcome-orb">
+          <div class="welcome-orb-inner">⚕️</div>
+        </div>
+        <h2>Antahkarana MedAssist</h2>
+        <p>Upload a medicine image or ask any pharmaceutical question. Powered by a 7-step reasoning pipeline combining Qwen2.5-7B, BLIP-2 vision, and ChromaDB RAG.</p>
+      </div>
+
+      <div class="typing" id="typing">
+        <div class="msg-avatar" style="background:linear-gradient(135deg,var(--teal),var(--indigo)); width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:.9rem; flex-shrink:0;">⚕️</div>
+        <div class="typing-dots">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-bar">
+      <div class="img-pill" id="img-pill">
+        📎 Image attached
+        <button onclick="clearImage()">✕</button>
+      </div>
+      <div class="input-wrap">
+        <textarea
+          id="chat-input"
+          placeholder="Ask about dosage, side effects, interactions, expiry…"
+          rows="1"
+        ></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendMessage()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+      <div class="input-hint">Enter to send · Shift+Enter for new line · RAJAGANAPATHY M, SRM University</div>
+    </div>
+  </main>
 </div>
 
-<footer>
-  Built by <span>RAJAGANAPATHY M</span> · SRM University · Antahkarana Research Project<br/>
-  NLP: Qwen2.5-7B-Instruct · VLM: BLIP-2 Flan-T5-XL · RAG: ChromaDB + HuggingFace MiniLM
-</footer>
+<div class="toast" id="toast"></div>
 
 <script>
-  let selectedFile = null;
+  // ── Config ────────────────────────────────────────────────────────
+  const API_BASE = 'https://antahkarana-api.kindrock-2ca528ff.centralindia.azurecontainerapps.io';
 
-  function setQ(el) {
-    document.getElementById('questionInput').value = el.textContent.trim();
-  }
+  // ── State ─────────────────────────────────────────────────────────
+  let currentImageFile = null;
 
-  function handleImageUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    selectedFile = file;
+  // ── DOM refs ──────────────────────────────────────────────────────
+  const messagesEl  = document.getElementById('messages');
+  const welcomeEl   = document.getElementById('welcome');
+  const typingEl    = document.getElementById('typing');
+  const inputEl     = document.getElementById('chat-input');
+  const sendBtn     = document.getElementById('send-btn');
+  const uploadZone  = document.getElementById('upload-zone');
+  const fileInput   = document.getElementById('file-input');
+  const imgPreview  = document.getElementById('img-preview');
+  const imgPill     = document.getElementById('img-pill');
+  const statusLabel = document.getElementById('status-label');
+
+  // ── Auto-resize textarea ──────────────────────────────────────────
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+  });
+
+  inputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  // ── Image upload ──────────────────────────────────────────────────
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) setImage(f);
+  });
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) setImage(e.target.files[0]);
+  });
+
+  function setImage(file) {
+    currentImageFile = file;
     const reader = new FileReader();
-    reader.onload = e => {
-      const preview = document.getElementById('imagePreview');
-      const placeholder = document.getElementById('uploadPlaceholder');
-      preview.src = e.target.result;
-      preview.style.display = 'block';
-      placeholder.style.display = 'none';
-      document.getElementById('uploadZone').classList.add('has-image');
-      document.getElementById('clearBtn').style.display = 'block';
+    reader.onload = ev => {
+      imgPreview.src = ev.target.result;
+      uploadZone.classList.add('has-image');
+      imgPill.classList.add('visible');
     };
     reader.readAsDataURL(file);
   }
 
   function clearImage() {
-    selectedFile = null;
-    document.getElementById('fileInput').value = '';
-    document.getElementById('imagePreview').style.display = 'none';
-    document.getElementById('uploadPlaceholder').style.display = 'block';
-    document.getElementById('uploadZone').classList.remove('has-image');
-    document.getElementById('clearBtn').style.display = 'none';
+    currentImageFile = null;
+    imgPreview.src = '';
+    uploadZone.classList.remove('has-image');
+    imgPill.classList.remove('visible');
+    fileInput.value = '';
   }
 
-  async function runPipeline() {
-    const question = document.getElementById('questionInput').value.trim();
-    if (!question) { alert('Please enter a question.'); return; }
+  // ── Quick ask ─────────────────────────────────────────────────────
+  function ask(q) {
+    inputEl.value = q;
+    inputEl.focus();
+    sendMessage();
+  }
 
-    const apiBase = document.getElementById('apiUrl').value.trim();
-    const btn = document.getElementById('submitBtn');
-    btn.disabled = true;
-    btn.textContent = '⏳ Running pipeline...';
+  // ── Pipeline animation ────────────────────────────────────────────
+  const steps = ['vision','manas','chitta','buddhi','ahamkara','sakshi'];
+  let pipelineTimer = null;
 
-    showLoading();
+  function animatePipeline(active) {
+    steps.forEach(s => {
+      document.querySelector(`[data-step="${s}"]`).classList.toggle('active', s === active);
+    });
+  }
+
+  function runPipelineAnim(callback) {
+    let i = 0;
+    pipelineTimer = setInterval(() => {
+      animatePipeline(steps[i]);
+      i++;
+      if (i >= steps.length) {
+        clearInterval(pipelineTimer);
+        steps.forEach(s => document.querySelector(`[data-step="${s}"]`).classList.remove('active'));
+        if (callback) callback();
+      }
+    }, 550);
+  }
+
+  function stopPipelineAnim() {
+    if (pipelineTimer) clearInterval(pipelineTimer);
+    steps.forEach(s => document.querySelector(`[data-step="${s}"]`).classList.remove('active'));
+  }
+
+  // ── Send message ──────────────────────────────────────────────────
+  async function sendMessage() {
+    const q = inputEl.value.trim();
+    if (!q) return;
+
+    hideWelcome();
+    addUserMsg(q);
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    sendBtn.disabled = true;
+    typingEl.classList.add('visible');
+    scrollDown();
+    statusLabel.textContent = 'Reasoning…';
+
+    const imageSnapshot = currentImageFile;
+
+    runPipelineAnim(null);
 
     try {
-      const formData = new FormData();
-      formData.append('question', question);
-      if (selectedFile) formData.append('image', selectedFile);
+      const fd = new FormData();
+      fd.append('question', q);
+      if (imageSnapshot) fd.append('image', imageSnapshot, imageSnapshot.name);
 
-      const resp = await fetch(`${apiBase}/reason`, { method: 'POST', body: formData });
-      if (!resp.ok) throw new Error(`API error ${resp.status}: ${await resp.text()}`);
-      const data = await resp.json();
-      renderTrace(data);
+      const res = await fetch(`${API_BASE}/api/reason`, {
+        method: 'POST',
+        body: fd,
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      stopPipelineAnim();
+      typingEl.classList.remove('visible');
+      statusLabel.textContent = 'Connected';
+
+      addBotMsg(data);
+
     } catch (err) {
-      showError(err.message);
+      stopPipelineAnim();
+      typingEl.classList.remove('visible');
+      statusLabel.textContent = 'Error';
+      console.error(err);
+      showToast('Could not reach Antahkarana backend. Check connection.');
+      addErrorMsg('⚠️ Failed to connect to the backend. Please ensure the server is running and try again.');
     } finally {
-      btn.disabled = false;
-      btn.textContent = '⚡ RUN ANTAHKARANA PIPELINE';
+      sendBtn.disabled = false;
+      scrollDown();
     }
   }
 
-  function showLoading() {
-    document.getElementById('welcomeCard').style.display = 'none';
-    const panel = document.getElementById('resultsPanel');
-    panel.innerHTML = '';
-    for (let i = 0; i < 4; i++) {
-      const card = document.createElement('div');
-      card.className = 'loading-card';
-      card.innerHTML = `
-        <div class="skel" style="height:16px;width:40%"></div>
-        <div class="skel" style="height:12px;width:80%"></div>
-        <div class="skel" style="height:12px;width:60%"></div>
-      `;
-      panel.appendChild(card);
-    }
+  // ── Render helpers ────────────────────────────────────────────────
+  function hideWelcome() {
+    if (welcomeEl) welcomeEl.style.display = 'none';
   }
 
-  function showError(msg) {
-    const panel = document.getElementById('resultsPanel');
-    panel.innerHTML = `<div class="error-card">❌ Error: ${escHtml(msg)}<br/><br/>Make sure the backend is running and the API URL is correct.</div>`;
+  function now() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  function renderTrace(data) {
-    const panel = document.getElementById('resultsPanel');
-    panel.innerHTML = '';
-
-    // Step 1: Vision
-    if (data.vision) {
-      panel.appendChild(makeVisionCard(data.vision));
-    }
-
-    // Step 2: Manas
-    if (data.manas) {
-      panel.appendChild(makeManasCard(data.manas));
-    }
-
-    // Step 3: Chitta
-    if (data.chitta) {
-      panel.appendChild(makeChittaCard(data.chitta));
-    }
-
-    // Step 4: Buddhi
-    if (data.buddhi) {
-      panel.appendChild(makeBuddhiCard(data.buddhi));
-    }
-
-    // Step 5: Ahamkara
-    if (data.ahamkara) {
-      panel.appendChild(makeAhamkaraCard(data.ahamkara));
-    }
-
-    // Step 6: Sakshi
-    if (data.sakshi) {
-      panel.appendChild(makeSakshiCard(data.sakshi));
-    }
-
-    // Step 7: Final Answer
-    panel.appendChild(makeFinalAnswerCard(data));
+  function md(text) {
+    if (!text) return '';
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em style="color:var(--indigo);font-style:normal">$1</em>')
+      .replace(/`([^`]+)`/g, '<code style="background:var(--bg3);padding:1px 5px;border-radius:4px;font-family:\'DM Mono\',monospace;font-size:.82em">$1</code>')
+      .replace(/\n/g, '<br>');
   }
 
-  function makeCard(stepNum, className, title, statusHtml, bodyHtml, startOpen = false) {
-    const id = `card-body-${Math.random().toString(36).slice(2)}`;
-    return htmlEl(`
-      <div class="trace-card ${className}">
-        <div class="card-header" onclick="toggleCard('${id}', this)">
-          <span class="step-badge">STEP ${stepNum}</span>
-          <span class="card-title">${title}</span>
-          ${statusHtml}
-          <span class="card-chevron ${startOpen ? 'open' : ''}">▶</span>
+  function addUserMsg(text) {
+    const div = document.createElement('div');
+    div.className = 'msg user';
+    div.innerHTML = `
+      <div class="msg-avatar">🧑</div>
+      <div class="msg-body">
+        <div class="msg-meta">${now()}</div>
+        <div class="msg-bubble">${md(text)}</div>
+      </div>`;
+    messagesEl.insertBefore(div, typingEl);
+  }
+
+  function addBotMsg(data) {
+    const finalAnswer = data.final_answer || data.sakshi?.final_answer || 'No answer returned.';
+    const disclaimer  = data.sakshi?.medical_disclaimer || '';
+    const sources     = data.sources || [];
+    const conf        = data.ahamkara?.confidence_score;
+    const confLabel   = data.ahamkara?.confidence_label || '';
+    const latency     = data.total_latency_s;
+
+    let confHTML = '';
+    if (conf !== undefined) {
+      const cls = conf >= 0.75 ? 'conf-high' : conf >= 0.45 ? 'conf-med' : 'conf-low';
+      const pct = Math.round(conf * 100);
+      confHTML = `<div class="conf-badge ${cls}">● ${confLabel} · ${pct}% confidence${latency ? ' · ' + latency + 's' : ''}</div>`;
+    }
+
+    let srcHTML = '';
+    if (sources.length) {
+      const chips = sources.slice(0, 6).map(s =>
+        `<span class="src-chip">${typeof s === 'string' ? s : (s.source || s.file || JSON.stringify(s))}</span>`
+      ).join('');
+      srcHTML = `<div class="sources">${chips}</div>`;
+    }
+
+    let discHTML = '';
+    if (disclaimer) {
+      discHTML = `<div class="disclaimer">⚕️ <span>${disclaimer}</span></div>`;
+    }
+
+    const div = document.createElement('div');
+    div.className = 'msg bot';
+    div.innerHTML = `
+      <div class="msg-avatar">⚕️</div>
+      <div class="msg-body">
+        <div class="msg-meta">Antahkarana · ${now()}</div>
+        <div class="msg-bubble">
+          ${md(finalAnswer)}
+          ${confHTML}
+          ${srcHTML}
+          ${discHTML}
         </div>
-        <div class="card-body ${startOpen ? 'open' : ''}" id="${id}">
-          ${bodyHtml}
-        </div>
-      </div>
-    `);
+      </div>`;
+    messagesEl.insertBefore(div, typingEl);
   }
 
-  function toggleCard(id, header) {
-    const body = document.getElementById(id);
-    const chevron = header.querySelector('.card-chevron');
-    body.classList.toggle('open');
-    chevron.classList.toggle('open');
+  function addErrorMsg(text) {
+    const div = document.createElement('div');
+    div.className = 'msg bot';
+    div.innerHTML = `
+      <div class="msg-avatar">⚕️</div>
+      <div class="msg-body">
+        <div class="msg-meta">Antahkarana · ${now()}</div>
+        <div class="msg-bubble" style="border-color:rgba(251,113,133,0.3)">${text}</div>
+      </div>`;
+    messagesEl.insertBefore(div, typingEl);
   }
 
-  function makeVisionCard(v) {
-    const method = v.extraction_method || 'BLIP-2';
-    const err = v.error;
-    const status = err
-      ? `<span class="card-status" style="background:rgba(239,68,68,0.1);color:var(--danger);border:1px solid rgba(239,68,68,0.3);">Error</span>`
-      : `<span class="card-status" style="background:rgba(249,115,22,0.1);color:var(--orange);border:1px solid rgba(249,115,22,0.3);">${method}</span>`;
-
-    const body = err ? `<div style="color:var(--danger)">${escHtml(err)}</div>` : `
-      <div class="med-info-grid">
-        ${medItem('Brand Name', v.brand_name)}
-        ${medItem('Generic Name', v.generic_name)}
-        ${medItem('Strength', v.strength)}
-        ${medItem('Form', v.form)}
-        ${medItem('Expiry Date', v.expiry_date)}
-        ${medItem('Manufacturer', v.manufacturer)}
-      </div>
-      ${v.warnings && v.warnings !== 'Not visible' ? `<div class="flag-item" style="margin-top:0.6rem">⚠️ ${escHtml(v.warnings)}</div>` : ''}
-    `;
-
-    return makeCard(1, 'card-vision', '👁 Vision — BLIP-2 Medicine Analysis', status, body, true);
+  function scrollDown() {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  function medItem(label, val) {
-    if (!val || val === 'Not detected' || val === 'Not visible') return '';
-    return `<div class="med-info-item"><div class="med-info-label">${label}</div><div class="med-info-value">${escHtml(val)}</div></div>`;
-  }
-
-  function makeManasCard(m) {
-    const confColor = m.confidence > 0.8 ? 'var(--success)' : m.confidence > 0.6 ? 'var(--warning)' : 'var(--danger)';
-    const status = `<span class="card-status" style="background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.3);">${m.question_type?.toUpperCase()}</span>`;
-    const body = `
-      <div class="kv-grid">
-        <div class="kv-key">Question Type</div><div class="kv-val" style="color:var(--purple);font-weight:600">${m.question_type}</div>
-        <div class="kv-key">Confidence</div><div class="kv-val">${(m.confidence * 100).toFixed(0)}%</div>
-        <div class="kv-key">Rationale</div><div class="kv-val">${escHtml(m.routing_rationale || '')}</div>
-        <div class="kv-key">Entities</div><div class="kv-val">${m.entities?.length ? m.entities.map(e => `<code style="background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:0.75rem">${escHtml(e)}</code>`).join(' ') : '<span style="color:var(--muted)">None</span>'}</div>
-      </div>
-    `;
-    return makeCard(2, 'card-manas', '🧭 Manas — Question Router', status, body, true);
-  }
-
-  function makeChittaCard(c) {
-    const status = `<span class="card-status" style="background:rgba(59,130,246,0.1);color:var(--blue);border:1px solid rgba(59,130,246,0.3);">${c.num_chunks} chunks</span>`;
-    const chunks = (c.retrieved_chunks || []).slice(0, 3);
-    const chunkHtml = chunks.length ? `
-      <div class="chunk-list">
-        ${chunks.map(ch => `
-          <div class="chunk-item">
-            <div class="chunk-meta">
-              <span class="chunk-source">📄 ${escHtml(ch.source || 'unknown')}</span>
-              <span class="chunk-score">${(ch.score * 100).toFixed(0)}% match</span>
-            </div>
-            <div class="chunk-text">${escHtml((ch.content || '').slice(0, 200))}${(ch.content || '').length > 200 ? '…' : ''}</div>
-          </div>
-        `).join('')}
-      </div>
-    ` : `<div style="color:var(--muted);font-size:0.82rem">No relevant chunks retrieved from ChromaDB</div>`;
-
-    const body = `
-      <div class="kv-grid" style="margin-bottom:0.75rem">
-        <div class="kv-key">Method</div><div class="kv-val">${c.retrieval_method || 'dense+chromadb'}</div>
-        <div class="kv-key">Total Chunks</div><div class="kv-val">${c.num_chunks}</div>
-      </div>
-      ${chunkHtml}
-    `;
-    return makeCard(3, 'card-chitta', '📚 Chitta — Dense Retrieval + ChromaDB', status, body);
-  }
-
-  function makeBuddhiCard(b) {
-    const passes = [b.pass3_fired ? 'Pass3' : b.pass2_fired ? 'Pass2' : 'Pass1'];
-    const status = `<span class="card-status" style="background:rgba(0,212,170,0.1);color:var(--primary);border:1px solid rgba(0,212,170,0.3);">${passes[0]}</span>`;
-
-    const steps = b.reasoning_steps || [];
-    const stepsHtml = steps.length ? `
-      <div class="reasoning-steps">
-        ${steps.map((s, i) => `
-          <div class="step-item">
-            <div class="step-num">${i + 1}</div>
-            <div>${escHtml(s)}</div>
-          </div>
-        `).join('')}
-      </div>
-    ` : '';
-
-    const body = `
-      <div class="kv-grid" style="margin-bottom:0.75rem">
-        <div class="kv-key">Model</div><div class="kv-val" style="font-size:0.75rem">${escHtml(b.model || 'Qwen2.5-7B')}</div>
-        <div class="kv-key">Latency</div><div class="kv-val">${b.latency_s}s</div>
-        <div class="kv-key">Pass 2 (Pramana)</div><div class="kv-val">${b.pass2_fired ? (b.pass2_verified ? '✅ Verified' : '🔧 Corrected') : '—'}</div>
-        <div class="kv-key">Pass 3 (Samsaya)</div><div class="kv-val">${b.pass3_fired ? '⚡ Self-consistency used' : '—'}</div>
-      </div>
-      ${stepsHtml}
-    `;
-    return makeCard(4, 'card-buddhi', '🧠 Buddhi — Qwen2.5-7B Reasoner', status, body, true);
-  }
-
-  function makeAhamkaraCard(a) {
-    const colMap = { HIGH: 'var(--success)', MEDIUM: 'var(--warning)', LOW: 'var(--orange)', VERY_LOW: 'var(--danger)' };
-    const col = colMap[a.confidence_label] || 'var(--muted)';
-    const status = `<span class="card-status" style="background:rgba(245,158,11,0.1);color:${col};border:1px solid ${col}40;">${a.confidence_label}</span>`;
-
-    const pct = Math.round((a.confidence_score || 0) * 100);
-    const body = `
-      <div class="kv-grid" style="margin-bottom:0.75rem">
-        <div class="kv-key">Pass Level</div><div class="kv-val">${escHtml(a.pass_level || '')}</div>
-        <div class="kv-key">Needs Retry</div><div class="kv-val">${a.needs_retry ? '⚠️ Yes' : '✅ No'}</div>
-      </div>
-      <div class="score-bar-wrap">
-        <div class="score-bar-label">
-          <span style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted)">CONFIDENCE SCORE</span>
-          <span style="font-family:'Space Mono',monospace;font-size:0.8rem;color:${col};font-weight:700">${pct}%</span>
-        </div>
-        <div class="score-bar-bg"><div class="score-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${col},${col}88)"></div></div>
-      </div>
-    `;
-    return makeCard(5, 'card-ahamkara', '⚖️ Ahamkara — Confidence Scorer', status, body, true);
-  }
-
-  function makeSakshiCard(s) {
-    const verified = s.verified;
-    const status = verified
-      ? `<span class="card-status" style="background:rgba(16,185,129,0.1);color:var(--success);border:1px solid rgba(16,185,129,0.3);">Verified</span>`
-      : `<span class="card-status" style="background:rgba(245,158,11,0.1);color:var(--warning);border:1px solid rgba(245,158,11,0.3);">Partial</span>`;
-
-    const flags = s.hallucination_flags || [];
-    const flagsHtml = flags.length ? `
-      <div class="flags-list" style="margin-top:0.75rem">
-        <div style="font-size:0.72rem;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:0.3rem">HALLUCINATION FLAGS</div>
-        ${flags.map(f => `<div class="flag-item">⚠️ ${escHtml(f)}</div>`).join('')}
-      </div>
-    ` : `<div style="color:var(--success);font-size:0.82rem;margin-top:0.5rem">✅ No hallucination flags detected</div>`;
-
-    const body = `
-      <div class="kv-grid">
-        <div class="kv-key">Grounded</div><div class="kv-val">${verified ? '✅ Yes' : '⚠️ Partial'}</div>
-        <div class="kv-key">Corrected</div><div class="kv-val">${s.corrected ? `🔧 Yes — ${escHtml(s.correction_note || '')}` : '✅ No correction needed'}</div>
-        <div class="kv-key">Summary</div><div class="kv-val">${escHtml(s.sakshi_summary || '')}</div>
-      </div>
-      ${flagsHtml}
-    `;
-    return makeCard(6, 'card-sakshi', '👁‍🗨 Sakshi — Hallucination Verifier', status, body, true);
-  }
-
-  function makeFinalAnswerCard(data) {
-    const latency = data.total_latency_s ? `<span class="latency-chip">⏱ ${data.total_latency_s}s total</span>` : '';
-    const sources = (data.sources || []).map(s => `<code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:0.72rem;border:1px solid var(--border)">📄 ${escHtml(s)}</code>`).join(' ');
-
-    const answer = (data.final_answer || data.sakshi?.final_answer || '').replace(/\*\*Sources:\*\*.*/s, '').trim();
-
-    const body = `
-      <div class="final-answer-box">${escHtml(answer)}</div>
-      ${sources ? `<div style="margin-top:0.6rem;font-size:0.72rem;color:var(--muted)">Sources: ${sources}</div>` : ''}
-      ${data.sakshi?.medical_disclaimer ? `<div class="disclaimer">${escHtml(data.sakshi.medical_disclaimer)}</div>` : ''}
-    `;
-
-    const status = latency;
-    return makeCard('✓', 'card-answer', '✅ Final Answer', status, body, true);
-  }
-
-  function htmlEl(html) {
-    const tpl = document.createElement('template');
-    tpl.innerHTML = html.trim();
-    return tpl.content.firstChild;
-  }
-
-  function escHtml(str) {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+  // ── Toast ─────────────────────────────────────────────────────────
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3500);
   }
 </script>
 </body>

@@ -1,0 +1,71 @@
+name: Build & Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+env:
+  ACR_NAME: antahkaranaacr
+  ACR_LOGIN_SERVER: antahkaranaacr.azurecr.io
+  IMAGE_NAME: backend
+  CONTAINER_APP_NAME: antahkarana-api
+  RESOURCE_GROUP: antahkarana-rg
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Login to Azure
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Step 3: Login to Azure Container Registry
+      - name: Login to ACR
+        run: az acr login --name ${{ env.ACR_NAME }}
+
+      # Step 4: Build Docker image (on GitHub servers — no GPU needed)
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest \
+            -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -f deployment/Dockerfile \
+            .
+
+      # Step 5: Push image to ACR
+      - name: Push image to ACR
+        run: |
+          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      # Step 6: Deploy new image to Azure Container Apps
+      - name: Deploy to Azure Container Apps
+        run: |
+          az containerapp update \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      # Step 7: Verify deployment is running
+      - name: Verify deployment
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 30
+          STATUS=$(az containerapp show \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "properties.runningStatus" -o tsv)
+          echo "Container App Status: $STATUS"
+          if [ "$STATUS" != "Running" ]; then
+            echo "Deployment may have issues. Check Azure portal."
+            exit 1
+          fi
+          echo "Deployment successful!"

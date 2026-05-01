@@ -139,13 +139,6 @@ class Sakshi:
             if re.search(pattern, answer, re.IGNORECASE):
                 flags.append(f"Detected absolute/risky language: {pattern}")
 
-        # Check if answer introduces drugs not mentioned in context
-        answer_drugs = re.findall(r'\b[A-Z][a-z]{3,}\b', answer)
-        for drug in answer_drugs:
-            if drug not in context and len(drug) > 4:
-                # Only flag capitalized drug-like names
-                flags.append(f"'{drug}' mentioned in answer but not in retrieved context")
-
         return flags[:3]  # Cap at 3 flags
 
     def _apply_corrections(

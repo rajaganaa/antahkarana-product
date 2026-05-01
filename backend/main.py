@@ -196,6 +196,11 @@ async def reason(
     logger.info(f"[{request_id}] Chitta: {chitta_result['num_chunks']} chunks")
 
     # ── STEP 5: Buddhi (reasoning) ───────────────────────────────────────────
+    # If vision couldn't identify drug, tell Buddhi explicitly
+    if vision_result and vision_result.get("drug_name") in ["Not visible", "Unknown", None]:
+        drug_hint = vision_result.get("brand_name", "")
+        if drug_hint and drug_hint not in ["Not visible", "Not detected"]:
+            question = f"[Medicine: {drug_hint}] {question}"
     buddhi_result = buddhi.reason(
         question=question,
         context_str=chitta_result["context_str"],
@@ -277,7 +282,7 @@ async def reason(
         "tool_result": tool_result,
 
         # Top-level helpers
-        "final_answer": sakshi_result["final_answer"],
+        "final_answer": tool_result["result"] if tool_result and "result" in tool_result else sakshi_result["final_answer"],
         "sources":      chitta_result["sources"],
     }
 

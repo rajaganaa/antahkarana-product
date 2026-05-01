@@ -1,40 +1,51 @@
 # deployment/Dockerfile — Antahkarana MedAssist
-# Target: GCP Cloud Run with L4 GPU (or CPU fallback)
+# Clean CPU build — no CUDA, no GPU, no BLIP-2, no vLLM
+# Vision: GitHub Models (GPT-4o)   LLM: Groq (GROQ_API_KEY)
 # Author: RAJAGANAPATHY M, SRM University
 
-FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+FROM python:3.11-slim
 
-# System deps
-RUN apt-get update && apt-get install -y \
-    python3.11 python3-pip python3.11-venv \
-    libgl1-mesa-glx libglib2.0-0 curl \
+# ── System deps ───────────────────────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        libgl1-mesa-glx \
+        libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
-
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
 WORKDIR /app
 
-# Copy backend code
+# ── Python dependencies ───────────────────────────────────────────────────────
+COPY backend/requirements.txt ./backend/requirements.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt
+
+# ── Application code ──────────────────────────────────────────────────────────
 COPY backend/ ./backend/
 COPY data/drug_guides/ ./data/drug_guides/
 
-# Install dependencies
-RUN pip3 install --no-cache-dir -r backend/requirements.txt
+# ── Pre-download embedding model (SentenceTransformer, CPU-only) ──────────────
+RUN python -c \
+    "from sentence_transformers import SentenceTransformer; \
+     SentenceTransformer('all-MiniLM-L6-v2')"
 
-# Pre-download embedding model
-RUN python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
-
-# Build ChromaDB index
+# ── Pre-build ChromaDB index from PDFs ────────────────────────────────────────
 ENV MEDASSIST_DATA_DIR=/app/data/drug_guides
 ENV CHROMA_PATH=/app/data/chroma_db
-RUN cd backend && python3 -c "import sys; sys.path.insert(0,'backend'); from rag.medassist_rag import build_index_if_needed; build_index_if_needed()" || true
+RUN cd /app && python -c \
+    "import sys; sys.path.insert(0, 'backend'); \
+     from rag.medassist_rag import build_index_if_needed; \
+     build_index_if_needed()" || true
 
-# Environment
-ENV USE_VLLM=true
-ENV MODEL_ID=Qwen/Qwen2.5-7B-Instruct
+# ── Runtime env (never GPU, never vLLM, never BLIP-2) ────────────────────────
+ENV USE_VLLM=false
+ENV USE_BLIP2=false
 ENV PORT=8000
 ENV PYTHONPATH=/app/backend
 
 EXPOSE 8000
 
-CMD ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "backend"]
+# ── Health check ──────────────────────────────────────────────────────────────
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["python", "-m", "uvicorn", "main:app", \
+     "--host", "0.0.0.0", "--port", "8000", "--app-dir", "backend"]

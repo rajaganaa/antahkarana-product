@@ -1,9 +1,16 @@
 """
 backend/main.py — Antahkarana FastAPI Backend
-Integrates: NLP Antahkarana (Qwen2.5-7B) + VLM Antahkarana (BLIP-2) + MedAssist RAG
+7-Step Antahkarana reasoning pipeline.
+
+Components:
+  Manas    — Question router / NLP classifier
+  Chitta   — Dense retrieval (ChromaDB)
+  Buddhi   — Groq LLM reasoner
+  Ahamkara — Confidence scorer
+  Sakshi   — Hallucination verifier
+  Vision   — GPT-4o via GitHub Models (blip2_extractor.py, BLIP-2 removed)
 
 Author: RAJAGANAPATHY M, SRM University
-Architecture: GCP L4 GPU (24GB VRAM) + GitHub Pages frontend
 """
 
 import os
@@ -30,8 +37,9 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Antahkarana MedAssist API",
     description=(
-        "Unified reasoning engine combining Antahkarana NLP (Qwen2.5-7B) + "
-        "Antahkarana VLM (BLIP-2) + MedAssist RAG (ChromaDB). "
+        "7-step Antahkarana reasoning engine: "
+        "Manas → Chitta → Buddhi (Groq) → Ahamkara → Sakshi. "
+        "Vision: GPT-4o via GitHub Models. "
         "Author: RAJAGANAPATHY M, SRM University."
     ),
     version="1.0.0",
@@ -39,13 +47,13 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict in production
+    allow_origins=["*"],   # Restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ── Lazy-loaded components ────────────────────────────────────────────────────
+# ── Lazy-loaded Antahkarana components ───────────────────────────────────────
 _manas = None
 _chitta = None
 _buddhi = None
@@ -65,11 +73,11 @@ def get_components():
         from engine.buddhi import Buddhi
         from engine.ahamkara import Ahamkara
         from engine.sakshi import Sakshi
-        _manas = Manas()
-        _chitta = Chitta()
-        _buddhi = Buddhi()
+        _manas    = Manas()
+        _chitta   = Chitta()
+        _buddhi   = Buddhi()
         _ahamkara = Ahamkara()
-        _sakshi = Sakshi()
+        _sakshi   = Sakshi()
         logger.info("[INIT] All Antahkarana components ready")
     return _manas, _chitta, _buddhi, _ahamkara, _sakshi
 
@@ -98,12 +106,16 @@ async def health_check():
         "author": "RAJAGANAPATHY M, SRM University",
         "version": "1.0.0",
         "components": {
-            "manas": "Question Router",
-            "chitta": "Dense Retrieval + ChromaDB",
-            "buddhi": "Qwen2.5-7B Reasoner",
+            "manas":    "Question Router",
+            "chitta":   "Dense Retrieval + ChromaDB",
+            "buddhi":   "Groq LLM Reasoner",
             "ahamkara": "Confidence Scorer",
-            "sakshi": "Hallucination Verifier",
-            "blip2": "Medicine Image Analyzer",
+            "sakshi":   "Hallucination Verifier",
+            "vision":   "GPT-4o Vision via GitHub Models",
+        },
+        "flags": {
+            "USE_VLLM":  os.environ.get("USE_VLLM", "false"),
+            "USE_BLIP2": os.environ.get("USE_BLIP2", "false"),
         },
     }
 
@@ -122,13 +134,14 @@ async def reason(
 ):
     """
     Full 7-step Antahkarana reasoning pipeline:
-    Step 1: Vision (BLIP-2 medicine analysis)
-    Step 2: Manas (question routing)
-    Step 3: Chitta (dense retrieval from ChromaDB)
-    Step 4: Buddhi (Qwen2.5-7B reasoning)
-    Step 5: Ahamkara (confidence scoring)
-    Step 6: Sakshi (verification + hallucination correction)
-    Step 7: Tool calls (FDA/dosage/expiry if triggered)
+
+    Step 1: Vision  — GPT-4o (GitHub Models) medicine image analysis
+    Step 2: Manas   — question type routing + entity extraction
+    Step 3: Chitta  — dense retrieval from ChromaDB (k=5)
+    Step 4: Buddhi  — Groq LLM multi-pass reasoning
+    Step 5: Ahamkara— confidence scoring
+    Step 6: Sakshi  — hallucination verification + correction
+    Step 7: Tools   — FDA / dosage / expiry if triggered by Manas
     """
     request_id = str(uuid.uuid4())[:8]
     t_total = time.time()
@@ -147,11 +160,12 @@ async def reason(
             with open(image_path, "wb") as f:
                 f.write(contents)
 
+            # Uses the rewritten blip2_extractor.py (GitHub Models / GPT-4o)
             from vision.blip2_extractor import extract_medicine_info
             vision_result = extract_medicine_info(str(image_path))
             logger.info(f"[{request_id}] Vision: {vision_result.get('drug_name', 'unknown')}")
 
-            # If question doesn't mention a drug but image shows one, inject it
+            # Inject drug name into question when not already present
             drug_name = vision_result.get("generic_name") or vision_result.get("brand_name", "")
             if drug_name and drug_name not in ["Not detected", "Not visible"] and drug_name not in question:
                 question = f"[About {drug_name}] {question}"
@@ -162,7 +176,7 @@ async def reason(
 
     # ── STEP 2: Manas ────────────────────────────────────────────────────────
     manas_result = manas.get_routing_info(question)
-    q_type = manas_result["question_type"]
+    q_type  = manas_result["question_type"]
     entities = manas_result["entities"]
     logger.info(f"[{request_id}] Manas: {q_type} (conf={manas_result['confidence']})")
 
@@ -178,7 +192,6 @@ async def reason(
         tool_result = await _handle_fda(entities, vision_result)
 
     # ── STEP 4: Chitta (retrieval) ────────────────────────────────────────────
-    # Always retrieve for RAG context, even if tool triggered
     chitta_result = chitta.retrieve(question, entities, k=5)
     logger.info(f"[{request_id}] Chitta: {chitta_result['num_chunks']} chunks")
 
@@ -189,11 +202,17 @@ async def reason(
         q_type=q_type,
         medicine_info=vision_result,
     )
-    logger.info(f"[{request_id}] Buddhi: pass={buddhi_result['pass2_fired']} latency={buddhi_result['latency_s']}s")
+    logger.info(
+        f"[{request_id}] Buddhi: pass={buddhi_result['pass2_fired']} "
+        f"latency={buddhi_result['latency_s']}s"
+    )
 
     # ── STEP 6: Ahamkara (confidence) ────────────────────────────────────────
     ahamkara_result = ahamkara.score(buddhi_result, chitta_result, question)
-    logger.info(f"[{request_id}] Ahamkara: {ahamkara_result['confidence_score']} ({ahamkara_result['confidence_label']})")
+    logger.info(
+        f"[{request_id}] Ahamkara: {ahamkara_result['confidence_score']} "
+        f"({ahamkara_result['confidence_label']})"
+    )
 
     # ── STEP 7: Sakshi (verification) ────────────────────────────────────────
     sakshi_result = sakshi.verify(
@@ -208,10 +227,10 @@ async def reason(
 
     total_latency = round(time.time() - t_total, 3)
 
-    # ── Assemble full API response ────────────────────────────────────────────
+    # ── Assemble API response ─────────────────────────────────────────────────
     response = {
-        "request_id": request_id,
-        "question": question,
+        "request_id":     request_id,
+        "question":       question,
         "total_latency_s": total_latency,
 
         # Step 1: Vision
@@ -223,21 +242,21 @@ async def reason(
         # Step 3: Chitta
         "chitta": {
             "retrieved_chunks": chitta_result["retrieved_chunks"],
-            "scores": [c.get("score", 0) for c in chitta_result["retrieved_chunks"]],
-            "num_chunks": chitta_result["num_chunks"],
+            "scores":           [c.get("score", 0) for c in chitta_result["retrieved_chunks"]],
+            "num_chunks":       chitta_result["num_chunks"],
             "retrieval_method": chitta_result["retrieval_method"],
         },
 
         # Step 4: Buddhi
         "buddhi": {
             "reasoning_steps": buddhi_result["reasoning_steps"],
-            "draft_answer": buddhi_result["draft_answer"],
-            "pass1_answer": buddhi_result["pass1_answer"],
-            "pass2_fired": buddhi_result["pass2_fired"],
-            "pass2_verified": buddhi_result["pass2_verified"],
-            "pass3_fired": buddhi_result["pass3_fired"],
-            "model": buddhi_result["model"],
-            "latency_s": buddhi_result["latency_s"],
+            "draft_answer":    buddhi_result["draft_answer"],
+            "pass1_answer":    buddhi_result["pass1_answer"],
+            "pass2_fired":     buddhi_result["pass2_fired"],
+            "pass2_verified":  buddhi_result["pass2_verified"],
+            "pass3_fired":     buddhi_result["pass3_fired"],
+            "model":           buddhi_result["model"],
+            "latency_s":       buddhi_result["latency_s"],
         },
 
         # Step 5: Ahamkara
@@ -245,21 +264,21 @@ async def reason(
 
         # Step 6: Sakshi
         "sakshi": {
-            "verified": sakshi_result["verified"],
-            "corrected": sakshi_result["corrected"],
+            "verified":            sakshi_result["verified"],
+            "corrected":           sakshi_result["corrected"],
             "hallucination_flags": sakshi_result["hallucination_flags"],
-            "correction_note": sakshi_result["correction_note"],
-            "final_answer": sakshi_result["final_answer"],
-            "sakshi_summary": sakshi_result["sakshi_summary"],
-            "medical_disclaimer": sakshi_result["medical_disclaimer"],
+            "correction_note":     sakshi_result["correction_note"],
+            "final_answer":        sakshi_result["final_answer"],
+            "sakshi_summary":      sakshi_result["sakshi_summary"],
+            "medical_disclaimer":  sakshi_result["medical_disclaimer"],
         },
 
         # Step 7: Tool results
         "tool_result": tool_result,
 
-        # Top-level final answer + sources
+        # Top-level helpers
         "final_answer": sakshi_result["final_answer"],
-        "sources": chitta_result["sources"],
+        "sources":      chitta_result["sources"],
     }
 
     # Cleanup uploaded image
@@ -277,10 +296,9 @@ async def reason(
 async def _handle_dosage(question: str, vision_result: Optional[dict]) -> dict:
     try:
         import re
-        from tools.dosage_calc import calculate_dosage, normalize_drug_name, DOSAGE_GUIDELINES
+        from tools.dosage_calc import calculate_dosage
 
-        # Extract parameters from question
-        weight_m = re.search(r'(\d+(?:\.\d+)?)\s*(?:kg|kilogram)', question, re.IGNORECASE)
+        weight_m = re.search(r"(\d+(?:\.\d+)?)\s*(?:kg|kilogram)", question, re.IGNORECASE)
         weight = float(weight_m.group(1)) if weight_m else 70.0
 
         age_group = "adult"
@@ -289,7 +307,6 @@ async def _handle_dosage(question: str, vision_result: Optional[dict]) -> dict:
         elif any(w in question.lower() for w in ["elderly", "old", "senior", "geriatric"]):
             age_group = "elderly"
 
-        # Drug from vision or question
         drug = "paracetamol"
         if vision_result:
             d = vision_result.get("generic_name") or vision_result.get("brand_name", "")
@@ -315,9 +332,9 @@ async def _handle_expiry(question: str, vision_result: Optional[dict]) -> dict:
         if not expiry_date:
             import re
             m = re.search(
-                r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4}\b'
-                r'|\b\d{1,2}[/\-]\d{4}\b|\b\d{4}[/\-]\d{1,2}\b',
-                question, re.IGNORECASE
+                r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4}\b"
+                r"|\b\d{1,2}[/\-]\d{4}\b|\b\d{4}[/\-]\d{1,2}\b",
+                question, re.IGNORECASE,
             )
             expiry_date = m.group(0) if m else "Unknown"
 
@@ -358,7 +375,7 @@ async def _handle_fda(entities: list, vision_result: Optional[dict]) -> dict:
         return {"tool": "fda_api", "error": str(e)}
 
 
-# ── Additional Utility Endpoints ──────────────────────────────────────────────
+# ── Utility Endpoints ─────────────────────────────────────────────────────────
 
 @app.get("/api/sources")
 async def list_sources():
@@ -378,7 +395,7 @@ async def search(query: str = Form(...)):
 
 @app.post("/api/vision")
 async def vision_only(image: UploadFile = File(...)):
-    """Standalone BLIP-2 medicine image analysis."""
+    """Standalone medicine image analysis (GPT-4o via GitHub Models)."""
     image_path = UPLOAD_DIR / f"{uuid.uuid4()}_{image.filename}"
     contents = await image.read()
     with open(image_path, "wb") as f:

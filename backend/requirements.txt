@@ -1,4 +1,7 @@
 # Antahkarana MedAssist — Backend Dependencies
+# CPU-only Azure deployment. NO vLLM. NO torch. NO accelerate.
+# LLM: Groq API (llama3-70b-8192)
+# Vision: GitHub Models (GPT-4o)
 # Author: RAJAGANAPATHY M, SRM University
 
 # ── Web Framework ─────────────────────────────────────────────────────────────
@@ -6,16 +9,16 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 python-multipart>=0.0.9
 
-# ── Core ML ───────────────────────────────────────────────────────────────────
-torch>=2.1.0
-transformers>=4.40.0
-accelerate>=0.27.0
+# ── LLM: Groq (PRIMARY — replaces vLLM) ──────────────────────────────────────
+groq>=0.9.0
+
+# ── LLM: GitHub Models / OpenAI-compatible (fallback) ────────────────────────
+openai>=1.25.0
+
+# ── Embeddings (CPU, no GPU required) ────────────────────────────────────────
 sentence-transformers>=2.6.0
 
-# ── Qwen2.5-7B via vLLM (GPU only — comment out for CPU dev) ─────────────────
-# vllm>=0.4.0
-
-# ── BLIP-2 (included in transformers above) ───────────────────────────────────
+# ── Image processing (for base64 encoding in vision module) ──────────────────
 Pillow>=10.0.0
 
 # ── RAG + Vector DB ───────────────────────────────────────────────────────────
@@ -27,7 +30,6 @@ pypdf>=4.0.0
 
 # ── MedAssist Tools ───────────────────────────────────────────────────────────
 requests>=2.31.0
-openai>=1.25.0
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 numpy>=1.24.0

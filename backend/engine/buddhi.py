@@ -1,10 +1,23 @@
 """
-engine/buddhi.py — Buddhi: Core Reasoner using Qwen2.5-7B via vLLM
-Antahkarana v16 adapted for MedAssist product.
+engine/buddhi.py — Buddhi: Core Reasoner using Groq (llama3-70b-8192)
+Antahkarana MedAssist — CPU-only Azure deployment.
 
 Buddhi is intellect/discriminative intelligence in Indian philosophy.
-It performs structured multi-pass reasoning using Qwen2.5-7B-Instruct.
-Exact prompt systems from antahkarana_QWEN_500/antahkarana/system.py.
+It performs structured multi-pass reasoning (Tarka → Pramana → Samsaya).
+
+BUG 2 FIX: Removed ALL vLLM code. Groq is now the PRIMARY engine using
+           the official `groq` Python library. No MockEngine. No `|||` separator.
+           If Groq fails, falls back to GitHub Models (GPT-4o) via openai library.
+
+Engine priority:
+  1. Groq (llama3-70b-8192)  — primary, fastest free LLM
+  2. GitHub Models (gpt-4o)  — fallback if GROQ_API_KEY missing/fails
+
+Return dict keys (unchanged):
+  reasoning_steps, pass1_raw, pass1_answer, pass2_raw, pass2_answer,
+  pass2_verified, pass2_fired, pass3_fired, draft_answer, latency_s, model
+
+Author: RAJAGANAPATHY M, SRM University
 """
 
 import os
@@ -15,161 +28,130 @@ from typing import Optional, List, Dict
 
 logger = logging.getLogger(__name__)
 
-# ── vLLM Engine Singleton ────────────────────────────────────────────────────
-_engine = None
+# ── Model configuration ───────────────────────────────────────────────────────
+GROQ_MODEL   = os.environ.get("GROQ_MODEL",   "llama3-70b-8192")
+GITHUB_MODEL = os.environ.get("GITHUB_MODEL", "gpt-4o")
 
-MODEL_ID  = os.environ.get("MODEL_ID",  "Qwen/Qwen2.5-7B-Instruct")
-HF_TOKEN  = os.environ.get("HF_TOKEN",  "")
-USE_VLLM  = os.environ.get("USE_VLLM",  "true").lower() == "true"
+# BUG 2 FIX: USE_VLLM is permanently False. We never attempt to load vLLM.
+# The env var is read only for /health reporting — it does not change behaviour.
+USE_VLLM = False  # Hardcoded. Azure has no GPU. vLLM is removed entirely.
+
+
+# ── Groq Engine (PRIMARY) ─────────────────────────────────────────────────────
+
+class GroqEngine:
+    """
+    Primary reasoning engine — Groq API with llama3-70b-8192.
+    Uses the official `groq` Python library (groq>=0.9.0).
+
+    BUG 2 FIX: This replaces the broken MockEngine that used `|||` separators
+    and required vLLM. Groq is called directly here with proper message dicts.
+    """
+
+    def __init__(self):
+        from groq import Groq
+        api_key = os.environ.get("GROQ_API_KEY", "")
+        if not api_key:
+            raise RuntimeError(
+                "GROQ_API_KEY environment variable is not set. "
+                "Add it to your .env or Azure portal settings."
+            )
+        self.client = Groq(api_key=api_key)
+        self.model  = GROQ_MODEL
+        logger.info(f"[BUDDHI] GroqEngine ready — model: {self.model}")
+
+    def chat(self, system: str, user: str, max_tokens: int = 1024, temperature: float = 0.0) -> str:
+        """Call Groq API with clean message dicts. No `|||` separator needed."""
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user",   "content": user},
+            ],
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        return response.choices[0].message.content.strip()
+
+
+# ── GitHub Models Fallback Engine ─────────────────────────────────────────────
+
+class GitHubModelsEngine:
+    """
+    Fallback engine — GitHub Models (GPT-4o) via openai library.
+    Used only when GROQ_API_KEY is missing or Groq API call fails.
+    """
+
+    def __init__(self):
+        from openai import OpenAI
+        token = os.environ.get("GITHUB_TOKEN", "")
+        if not token:
+            raise RuntimeError(
+                "GITHUB_TOKEN environment variable is not set. "
+                "Cannot use GitHub Models fallback engine."
+            )
+        self.client = OpenAI(
+            base_url="https://models.inference.ai.azure.com",
+            api_key=token,
+        )
+        self.model = GITHUB_MODEL
+        logger.info(f"[BUDDHI] GitHubModelsEngine ready — model: {self.model}")
+
+    def chat(self, system: str, user: str, max_tokens: int = 1024, temperature: float = 0.0) -> str:
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user",   "content": user},
+            ],
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        return response.choices[0].message.content.strip()
+
+
+# ── Engine factory ────────────────────────────────────────────────────────────
+
+_engine_instance = None
 
 
 def _get_engine():
-    global _engine
-    if _engine is not None:
-        return _engine
-
-    if not USE_VLLM:
-        logger.info("[BUDDHI] vLLM disabled — using GitHub Models / Groq fallback engine")
-        _engine = MockEngine()
-        return _engine
-
-    try:
-        from vllm import LLM
-        from transformers import AutoTokenizer
-
-        logger.info(f"[BUDDHI] Loading {MODEL_ID} via vLLM on L4 GPU...")
-        llm = LLM(
-            model=MODEL_ID,
-            tensor_parallel_size=1,
-            gpu_memory_utilization=0.92,
-            max_model_len=4096,
-            trust_remote_code=True,
-            dtype="bfloat16",
-            enforce_eager=False,
-            max_num_batched_tokens=8192,
-            max_num_seqs=64,
-        )
-        tokenizer = AutoTokenizer.from_pretrained(
-            MODEL_ID,
-            token=HF_TOKEN or None,
-            trust_remote_code=True,
-        )
-        _engine = VLLMEngine(llm, tokenizer)
-        logger.info("[BUDDHI] vLLM engine ready")
-    except Exception as e:
-        logger.warning(f"[BUDDHI] vLLM load failed ({e}) — falling back to GitHub Models / Groq engine")
-        _engine = MockEngine()
-
-    return _engine
-
-
-class VLLMEngine:
-    def __init__(self, llm, tokenizer):
-        self.llm = llm
-        self.tokenizer = tokenizer
-
-    def apply_chat_template(self, system: str, user: str) -> str:
-        messages = [
-            {"role": "system", "content": system},
-            {"role": "user",   "content": user},
-        ]
-        return self.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-
-    def generate(self, prompt: str, max_tokens: int = 1024, temperature: float = 0.0) -> str:
-        from vllm import SamplingParams
-        sp = SamplingParams(temperature=temperature, max_tokens=max_tokens, top_p=0.95)
-        outputs = self.llm.generate([prompt], sp, use_tqdm=False)
-        return outputs[0].outputs[0].text.strip()
-
-
-class MockEngine:
     """
-    Fallback engine — tries GitHub Models (GPT-4o) first, then Groq (LLaMA).
-    No keys are cached at import time; always read fresh from env.
+    Return the best available engine.
+    Priority: Groq → GitHub Models.
+    BUG 2 FIX: vLLM is never attempted.
     """
+    global _engine_instance
+    if _engine_instance is not None:
+        return _engine_instance
 
-    def apply_chat_template(self, system: str, user: str) -> str:
-        self._system = system
-        self._user   = user
-        return f"{system}|||{user}"
+    # Try Groq first
+    groq_key = os.environ.get("GROQ_API_KEY", "")
+    if groq_key:
+        try:
+            _engine_instance = GroqEngine()
+            logger.info("[BUDDHI] Using GroqEngine as primary engine")
+            return _engine_instance
+        except Exception as e:
+            logger.warning(f"[BUDDHI] GroqEngine init failed ({e}) — trying GitHub Models")
 
-    def generate(self, prompt: str, max_tokens: int = 1024, temperature: float = 0.0) -> str:
-        import requests
+    # Fallback: GitHub Models
+    github_token = os.environ.get("GITHUB_TOKEN", "")
+    if github_token:
+        try:
+            _engine_instance = GitHubModelsEngine()
+            logger.info("[BUDDHI] Using GitHubModelsEngine as fallback engine")
+            return _engine_instance
+        except Exception as e:
+            logger.error(f"[BUDDHI] GitHubModelsEngine init failed: {e}")
 
-        parts  = prompt.split("|||", 1)
-        system = parts[0] if len(parts) > 1 else "You are a medical assistant."
-        user   = parts[1] if len(parts) > 1 else prompt
-
-        # ── Try GitHub Models (GPT-4o) first ────────────────────────────────
-        github_token = os.environ.get("GITHUB_TOKEN", "")
-        if github_token:
-            try:
-                headers = {
-                    "Authorization": f"Bearer {github_token}",
-                    "Content-Type":  "application/json",
-                }
-                body = {
-                    "model": "gpt-4o",
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user",   "content": user},
-                    ],
-                    "max_tokens":  max_tokens,
-                    "temperature": temperature,
-                }
-                r = requests.post(
-                    "https://models.inference.ai.azure.com/chat/completions",
-                    headers=headers,
-                    json=body,
-                    timeout=30,
-                )
-                r.raise_for_status()
-                result = r.json()["choices"][0]["message"]["content"].strip()
-                logger.info("[BUDDHI] GitHub Models (GPT-4o) responded successfully")
-                return result
-            except Exception as e:
-                logger.warning(f"[BUDDHI/GitHub] GPT-4o failed ({e}) — trying Groq")
-
-        # ── Try Groq (LLaMA) as second fallback ─────────────────────────────
-        groq_key = os.environ.get("GROQ_API_KEY", "")
-        if groq_key:
-            try:
-                headers = {
-                    "Authorization": f"Bearer {groq_key}",
-                    "Content-Type":  "application/json",
-                }
-                body = {
-                    "model": "llama-3.1-8b-instant",
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user",   "content": user},
-                    ],
-                    "max_tokens":  max_tokens,
-                    "temperature": temperature,
-                }
-                r = requests.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers=headers,
-                    json=body,
-                    timeout=30,
-                )
-                r.raise_for_status()
-                result = r.json()["choices"][0]["message"]["content"].strip()
-                logger.info("[BUDDHI] Groq (LLaMA) responded successfully")
-                return result
-            except Exception as e:
-                logger.error(f"[BUDDHI/Groq] API call failed: {e}")
-                return f"ANSWER: Error calling Groq API: {e}"
-
-        return (
-            "ANSWER: No API key configured. "
-            "Set GITHUB_TOKEN or GROQ_API_KEY environment variable."
-        )
+    raise RuntimeError(
+        "No LLM engine available. Set GROQ_API_KEY (preferred) "
+        "or GITHUB_TOKEN in your environment variables."
+    )
 
 
-# ── Prompt Systems ─────────────────────────────────────────────────────────────
+# ── Prompt Systems (Antahkarana philosophy preserved) ─────────────────────────
 
 MEDICAL_SYSTEM = (
     "You are MedAssist, a medical information assistant. "
@@ -204,6 +186,7 @@ VERIFICATION_SYSTEM = (
     "ANSWER: SUPPORTED or NOT SUPPORTED or INSUFFICIENT EVIDENCE"
 )
 
+# Pramana — second-pass Tarka verification (Sanskrit: valid knowledge / proof)
 PRAMANA_SYSTEM = (
     "You are a strict medical fact verifier. "
     "Check if the draft answer is supported by the medical context.\n\n"
@@ -218,7 +201,21 @@ PRAMANA_SYSTEM = (
 )
 
 
+# ── Buddhi Class ──────────────────────────────────────────────────────────────
+
 class Buddhi:
+    """
+    Buddhi — The discriminative intellect.
+
+    Multi-pass reasoning pipeline (Tarka → Pramana → Samsaya):
+      Pass 1 (Tarka)   — initial LLM reasoning with context
+      Pass 2 (Pramana) — verification against retrieved context
+      Pass 3 (Samsaya) — self-consistency sampling if answer is bad
+
+    BUG 2 FIX: Uses GroqEngine as primary. No vLLM. No MockEngine.
+               Max 2 LLM calls per request (Pass 3 only fires on bad answers).
+    """
+
     def __init__(self):
         self._engine = None
 
@@ -228,9 +225,23 @@ class Buddhi:
             self._engine = _get_engine()
         return self._engine
 
-    def reason(self, question: str, context_str: str, q_type: str, medicine_info: Optional[Dict] = None) -> dict:
+    def reason(
+        self,
+        question: str,
+        context_str: str,
+        q_type: str,
+        medicine_info: Optional[Dict] = None,
+    ) -> dict:
+        """
+        Run Antahkarana multi-pass reasoning.
+
+        Returns dict with exactly these keys:
+          reasoning_steps, pass1_raw, pass1_answer, pass2_raw, pass2_answer,
+          pass2_verified, pass2_fired, pass3_fired, draft_answer, latency_s, model
+        """
         t0 = time.time()
 
+        # Build vision context prefix (Chitta memory enrichment)
         vision_ctx = ""
         if medicine_info:
             name     = medicine_info.get("generic_name") or medicine_info.get("brand_name", "")
@@ -243,35 +254,36 @@ class Buddhi:
 
         system      = self._select_system(q_type)
         user_prompt = f"Medical Context:\n{full_context}\n\nQuestion: {question}"
-        prompt      = self.engine.apply_chat_template(system, user_prompt)
 
-        pass1_raw    = self.engine.generate(prompt, max_tokens=1024)
+        # ── Pass 1: Tarka (initial reasoning) ────────────────────────────────
+        pass1_raw    = self.engine.chat(system, user_prompt, max_tokens=1024)
         pass1_answer = self._extract_answer(pass1_raw)
         pass1_steps  = self._extract_reasoning_steps(pass1_raw)
 
+        # ── Pass 2: Pramana (verification against context) ───────────────────
         pass2_raw      = ""
         pass2_answer   = pass1_answer
         pass2_verified = True
         pass2_fired    = False
 
         if full_context.strip() and not self._is_bad_answer(pass1_answer):
-            pramana_user   = (
+            pramana_user = (
                 f"Question: {question}\n\n"
                 f"Draft answer: {pass1_answer}\n\n"
                 f"Medical Context:\n{full_context[:2000]}"
             )
-            pramana_prompt  = self.engine.apply_chat_template(PRAMANA_SYSTEM, pramana_user)
-            pass2_raw       = self.engine.generate(pramana_prompt, max_tokens=512)
+            pass2_raw       = self.engine.chat(PRAMANA_SYSTEM, pramana_user, max_tokens=512)
             pass2_answer, pass2_verified = self._extract_pramana(pass2_raw, pass1_answer)
             pass2_fired     = True
 
+        # ── Pass 3: Samsaya (self-consistency — only if answer still bad) ────
         pass3_fired  = False
         final_answer = pass2_answer
 
         if self._is_bad_answer(pass2_answer):
             candidates = []
             for _ in range(3):
-                alt = self.engine.generate(prompt, max_tokens=512, temperature=0.7)
+                alt = self.engine.chat(system, user_prompt, max_tokens=512, temperature=0.7)
                 candidates.append(self._extract_answer(alt))
             candidates = [c for c in candidates if not self._is_bad_answer(c)]
             if candidates:
@@ -293,7 +305,7 @@ class Buddhi:
             "pass3_fired":     pass3_fired,
             "draft_answer":    final_answer,
             "latency_s":       elapsed,
-            "model":           MODEL_ID,
+            "model":           getattr(self._engine, "model", "unknown"),
         }
 
     def _select_system(self, q_type: str) -> str:
@@ -325,6 +337,7 @@ class Buddhi:
         return steps
 
     def _extract_pramana(self, raw: str, draft: str):
+        """Parse Pramana verification response."""
         supported_m = re.search(r'Supported\s*:\s*(yes|no)',            raw, re.IGNORECASE)
         revised_m   = re.search(r'Revised answer\s*:\s*(.+?)(?:\n|$)', raw, re.IGNORECASE)
         if revised_m and supported_m and supported_m.group(1).lower() == "no":
@@ -335,7 +348,8 @@ class Buddhi:
 
     APOLOGY_PATTERNS = [
         "i don't know", "i cannot", "i am not sure", "no information",
-        "sorry", "cannot determine", "unclear", "i'm not certain", "not available","i'm not aware", "not aware of any",
+        "sorry", "cannot determine", "unclear", "i'm not certain",
+        "not available", "i'm not aware", "not aware of any",
     ]
 
     def _is_bad_answer(self, answer: str) -> bool:

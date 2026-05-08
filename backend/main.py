@@ -5,15 +5,22 @@ backend/main.py — Antahkarana FastAPI Backend
 Components:
   Manas    — Question router / NLP classifier
   Chitta   — Dense retrieval (ChromaDB)
-  Buddhi   — Groq LLM reasoner
+  Buddhi   — Groq LLM reasoner (llama3-70b-8192, NO vLLM)
   Ahamkara — Confidence scorer
   Sakshi   — Hallucination verifier
-  Vision   — GPT-4o via GitHub Models (blip2_extractor.py, BLIP-2 removed)
+  Vision   — GPT-4o via GitHub Models (blip2_extractor.py)
+
+BUG FIXES:
+  Bug 1 FIXED: final_answer ALWAYS comes from sakshi_result["final_answer"].
+               Tool result is supplementary data only — never used as final_answer.
+  Bug 3 FIXED: _handle_dosage() extracts drug name from question text, entities,
+               and vision result before defaulting to "paracetamol".
 
 Author: RAJAGANAPATHY M, SRM University
 """
 
 import os
+import re
 import uuid
 import logging
 import time
@@ -54,11 +61,11 @@ app.add_middleware(
 )
 
 # ── Lazy-loaded Antahkarana components ───────────────────────────────────────
-_manas = None
-_chitta = None
-_buddhi = None
+_manas    = None
+_chitta   = None
+_buddhi   = None
 _ahamkara = None
-_sakshi = None
+_sakshi   = None
 
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/tmp/antahkarana_uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -108,7 +115,7 @@ async def health_check():
         "components": {
             "manas":    "Question Router",
             "chitta":   "Dense Retrieval + ChromaDB",
-            "buddhi":   "Groq LLM Reasoner",
+            "buddhi":   "Groq LLM Reasoner (llama3-70b-8192)",
             "ahamkara": "Confidence Scorer",
             "sakshi":   "Hallucination Verifier",
             "vision":   "GPT-4o Vision via GitHub Models",
@@ -142,6 +149,9 @@ async def reason(
     Step 5: Ahamkara— confidence scoring
     Step 6: Sakshi  — hallucination verification + correction
     Step 7: Tools   — FDA / dosage / expiry if triggered by Manas
+
+    BUG 1 FIX: final_answer ALWAYS = sakshi_result["final_answer"].
+               Tool result is returned as supplementary data only.
     """
     request_id = str(uuid.uuid4())[:8]
     t_total = time.time()
@@ -160,7 +170,6 @@ async def reason(
             with open(image_path, "wb") as f:
                 f.write(contents)
 
-            # Uses the rewritten blip2_extractor.py (GitHub Models / GPT-4o)
             from vision.blip2_extractor import extract_medicine_info
             vision_result = extract_medicine_info(str(image_path))
             logger.info(f"[{request_id}] Vision: {vision_result.get('drug_name', 'unknown')}")
@@ -176,7 +185,7 @@ async def reason(
 
     # ── STEP 2: Manas ────────────────────────────────────────────────────────
     manas_result = manas.get_routing_info(question)
-    q_type  = manas_result["question_type"]
+    q_type   = manas_result["question_type"]
     entities = manas_result["entities"]
     logger.info(f"[{request_id}] Manas: {q_type} (conf={manas_result['confidence']})")
 
@@ -185,7 +194,7 @@ async def reason(
     from engine.manas import QType
 
     if q_type == QType.DOSAGE:
-        tool_result = await _handle_dosage(question, vision_result)
+        tool_result = await _handle_dosage(question, entities, vision_result)
     elif q_type == QType.EXPIRY:
         tool_result = await _handle_expiry(question, vision_result)
     elif q_type == QType.FDA:
@@ -196,11 +205,11 @@ async def reason(
     logger.info(f"[{request_id}] Chitta: {chitta_result['num_chunks']} chunks")
 
     # ── STEP 5: Buddhi (reasoning) ───────────────────────────────────────────
-    # If vision couldn't identify drug, tell Buddhi explicitly
     if vision_result and vision_result.get("drug_name") in ["Not visible", "Unknown", None]:
         drug_hint = vision_result.get("brand_name", "")
         if drug_hint and drug_hint not in ["Not visible", "Not detected"]:
             question = f"[Medicine: {drug_hint}] {question}"
+
     buddhi_result = buddhi.reason(
         question=question,
         context_str=chitta_result["context_str"],
@@ -233,9 +242,11 @@ async def reason(
     total_latency = round(time.time() - t_total, 3)
 
     # ── Assemble API response ─────────────────────────────────────────────────
+    # BUG 1 FIX: final_answer ALWAYS comes from sakshi_result["final_answer"].
+    # Tool result is supplementary data — never overrides Sakshi's verified answer.
     response = {
-        "request_id":     request_id,
-        "question":       question,
+        "request_id":      request_id,
+        "question":        question,
         "total_latency_s": total_latency,
 
         # Step 1: Vision
@@ -278,12 +289,20 @@ async def reason(
             "medical_disclaimer":  sakshi_result["medical_disclaimer"],
         },
 
-        # Step 7: Tool results
+        # Step 7: Tool results (supplementary only)
         "tool_result": tool_result,
 
-        # Top-level helpers
-        "final_answer": tool_result["result"] if tool_result and "result" in tool_result else sakshi_result["final_answer"],
-        "sources":      chitta_result["sources"],
+        # ── BUG 1 FIX ────────────────────────────────────────────────────────
+        # final_answer ALWAYS = sakshi_result["final_answer"].
+        # Tool result is supplementary data — it NEVER overrides Sakshi.
+        # The old broken line was:
+        #   "final_answer": tool_result["result"] if tool_result and "result" in tool_result
+        #                   else sakshi_result["final_answer"]
+        # That caused cetirizine questions to show paracetamol dosage as the answer.
+        "final_answer": sakshi_result["final_answer"],
+        # ─────────────────────────────────────────────────────────────────────
+
+        "sources": chitta_result["sources"],
     }
 
     # Cleanup uploaded image
@@ -298,29 +317,86 @@ async def reason(
 
 # ── Tool Handlers ─────────────────────────────────────────────────────────────
 
-async def _handle_dosage(question: str, vision_result: Optional[dict]) -> dict:
+# Known drug names for text-based extraction
+_KNOWN_DRUGS = [
+    "cetirizine", "paracetamol", "acetaminophen", "ibuprofen", "amoxicillin",
+    "dolo", "crocin", "calpol", "tylenol", "advil", "motrin", "brufen",
+    "augmentin", "zyrtec",
+]
+
+
+def _extract_drug_from_question(question: str, entities: list, vision_result: Optional[dict]) -> str:
+    """
+    BUG 3 FIX: Extract drug name from question text, entities, and vision result.
+
+    Priority:
+      1. Scan question text for known drug names (case-insensitive)
+      2. Check vision result generic_name / brand_name
+      3. Check Manas entities list
+      4. Default to "paracetamol" only if nothing found
+
+    The old code jumped straight to step 2/4, causing cetirizine/ibuprofen
+    questions to always calculate paracetamol dosage.
+    """
+    q_lower = question.lower()
+
+    # Priority 1: scan question text for known drug keywords
+    for drug in _KNOWN_DRUGS:
+        if drug in q_lower:
+            logger.info(f"[DOSAGE] Drug extracted from question text: {drug}")
+            return drug
+
+    # Priority 2: vision result (if image was uploaded)
+    if vision_result:
+        d = vision_result.get("generic_name") or vision_result.get("brand_name", "")
+        if d and d not in ["Not detected", "Not visible"]:
+            logger.info(f"[DOSAGE] Drug extracted from vision: {d}")
+            return d.lower()
+
+    # Priority 3: Manas entities
+    if entities:
+        for entity in entities:
+            e_lower = entity.lower()
+            if any(drug in e_lower or e_lower in drug for drug in _KNOWN_DRUGS):
+                logger.info(f"[DOSAGE] Drug extracted from entities: {entity}")
+                return e_lower
+
+    # Priority 4: default
+    logger.info("[DOSAGE] No drug found — defaulting to paracetamol")
+    return "paracetamol"
+
+
+async def _handle_dosage(question: str, entities: list, vision_result: Optional[dict]) -> dict:
+    """
+    BUG 3 FIX: Always extract drug from question/entities/vision before defaulting.
+    Old code ignored question text and always fell back to paracetamol.
+    """
     try:
-        import re
         from tools.dosage_calc import calculate_dosage
 
         weight_m = re.search(r"(\d+(?:\.\d+)?)\s*(?:kg|kilogram)", question, re.IGNORECASE)
         weight = float(weight_m.group(1)) if weight_m else 70.0
 
         age_group = "adult"
-        if any(w in question.lower() for w in ["child", "kid", "pediatric", "baby", "infant"]):
+        q_lower = question.lower()
+        if any(w in q_lower for w in ["child", "kid", "pediatric", "baby", "infant", "year-old", "years old"]):
             age_group = "child"
-        elif any(w in question.lower() for w in ["elderly", "old", "senior", "geriatric"]):
+        elif any(w in q_lower for w in ["elderly", "old", "senior", "geriatric"]):
             age_group = "elderly"
 
-        drug = "paracetamol"
-        if vision_result:
-            d = vision_result.get("generic_name") or vision_result.get("brand_name", "")
-            if d and d not in ["Not detected", "Not visible"]:
-                drug = d
+        # BUG 3 FIX: properly extract drug name
+        drug = _extract_drug_from_question(question, entities, vision_result)
 
         result_text = calculate_dosage.invoke({"drug": drug, "weight_kg": weight, "age_group": age_group})
-        return {"tool": "dosage_calculator", "drug": drug, "weight_kg": weight, "age_group": age_group, "result": result_text}
+        return {
+            "tool": "dosage_calculator",
+            "drug": drug,
+            "weight_kg": weight,
+            "age_group": age_group,
+            "result": result_text,
+        }
     except Exception as e:
+        logger.error(f"[DOSAGE] Tool error: {e}")
         return {"tool": "dosage_calculator", "error": str(e)}
 
 
@@ -335,7 +411,6 @@ async def _handle_expiry(question: str, vision_result: Optional[dict]) -> dict:
                 expiry_date = None
 
         if not expiry_date:
-            import re
             m = re.search(
                 r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4}\b"
                 r"|\b\d{1,2}[/\-]\d{4}\b|\b\d{4}[/\-]\d{1,2}\b",
@@ -349,6 +424,7 @@ async def _handle_expiry(question: str, vision_result: Optional[dict]) -> dict:
         result_text = check_medicine_expiry.invoke(expiry_date)
         return {"tool": "expiry_checker", "expiry_date": expiry_date, "result": result_text}
     except Exception as e:
+        logger.error(f"[EXPIRY] Tool error: {e}")
         return {"tool": "expiry_checker", "error": str(e)}
 
 
@@ -377,6 +453,7 @@ async def _handle_fda(entities: list, vision_result: Optional[dict]) -> dict:
             ]
         return {"tool": "fda_api", "drug": drug, "reactions": reactions}
     except Exception as e:
+        logger.error(f"[FDA] Tool error: {e}")
         return {"tool": "fda_api", "error": str(e)}
 
 

@@ -1,6 +1,7 @@
 # deployment/Dockerfile — Antahkarana MedAssist
-# Clean CPU build — no CUDA, no GPU, no BLIP-2, no vLLM
-# Vision: GitHub Models (GPT-4o)   LLM: Groq (GROQ_API_KEY)
+# CPU-only build — no CUDA, no GPU, no BLIP-2, no vLLM
+# LLM:    Groq API (llama3-70b-8192)  ← set GROQ_API_KEY in Azure Portal
+# Vision: GitHub Models (GPT-4o)      ← set GITHUB_TOKEN in Azure Portal
 # Author: RAJAGANAPATHY M, SRM University
 
 FROM python:3.11-slim
@@ -35,7 +36,7 @@ RUN cd /app && python -c \
      from rag.medassist_rag import build_index_if_needed; \
      build_index_if_needed()" || true
 
-# ── Runtime env (never GPU, never vLLM, never BLIP-2) ────────────────────────
+# ── Runtime env (CPU only, no vLLM, no BLIP-2) ───────────────────────────────
 ENV USE_VLLM=false
 ENV USE_BLIP2=false
 ENV PORT=8000

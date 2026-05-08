@@ -633,10 +633,10 @@
     <div class="pipeline">
       <div class="section-label">Reasoning Pipeline</div>
       <div class="pipeline-steps" id="pipeline-steps">
-        <div class="ps" data-step="vision"><div class="ps-dot"></div><span class="ps-name">GPT-4o Vision</span></div>
+        <div class="ps" data-step="vision"><div class="ps-dot"></div><span class="ps-name">BLIP-2 Vision</span></div>
         <div class="ps" data-step="manas"><div class="ps-dot"></div><span class="ps-name">Manas · Router</span></div>
         <div class="ps" data-step="chitta"><div class="ps-dot"></div><span class="ps-name">Chitta · Retrieval</span></div>
-        <div class="ps" data-step="buddhi"><div class="ps-dot"></div><span class="ps-name">Buddhi · Groq LLaMA3</span></div>
+        <div class="ps" data-step="buddhi"><div class="ps-dot"></div><span class="ps-name">Buddhi · Qwen2.5</span></div>
         <div class="ps" data-step="ahamkara"><div class="ps-dot"></div><span class="ps-name">Ahamkara · Confidence</span></div>
         <div class="ps" data-step="sakshi"><div class="ps-dot"></div><span class="ps-name">Sakshi · Verify</span></div>
       </div>
@@ -648,7 +648,7 @@
     <div class="topbar">
       <div class="topbar-left">
         <h2>Antahkarana MedAssist</h2>
-        <p>Intelligent pharmaceutical reasoning · Groq LLaMA3-70B + GPT-4o + ChromaDB RAG</p>
+        <p>Intelligent pharmaceutical reasoning · Qwen2.5-7B + BLIP-2 + ChromaDB RAG</p>
       </div>
       <div class="status-pill">
         <div class="status-dot"></div>
@@ -875,12 +875,77 @@
   }
 
   function addBotMsg(data) {
-    const finalAnswer = data.final_answer || data.sakshi?.final_answer || 'No answer returned.';
-    const disclaimer  = data.sakshi?.medical_disclaimer || '';
-    const sources     = data.sources || [];
-    const conf        = data.ahamkara?.confidence_score;
-    const confLabel   = data.ahamkara?.confidence_label || '';
-    const latency     = data.total_latency_s;
+    // ── 1. Pick best answer: tool_result > final_answer ──────────
+    let finalAnswer = data.final_answer || data.sakshi?.final_answer || 'No answer returned.';
+
+    // If tool ran successfully (expiry, drug interaction etc), show it first
+    let toolHTML = '';
+    if (data.tool_result && !data.tool_result.error) {
+      const tr = data.tool_result;
+      if (tr.result) {
+        // expiry checker result
+        const isExpired = tr.result.includes('EXPIRED');
+        const color = isExpired ? 'var(--rose)' : 'var(--green)';
+        const icon  = isExpired ? '❌' : '✅';
+        toolHTML = `
+          <div style="
+            background:${isExpired ? 'rgba(251,113,133,0.08)' : 'rgba(52,211,153,0.08)'};
+            border:1px solid ${color};
+            border-radius:10px;
+            padding:12px 14px;
+            margin-bottom:12px;
+            font-family:'DM Mono',monospace;
+            font-size:0.78rem;
+            color:${color};
+            white-space:pre-wrap;
+            line-height:1.6;
+          ">${icon} ${tr.result}</div>`;
+      }
+    }
+
+    // ── 2. Vision card — show if image was analyzed ───────────────
+    let visionHTML = '';
+    const v = data.vision;
+    if (v && v.extraction_method && v.extraction_method !== 'None' && !v.error) {
+      const fields = [
+        ['Brand',        v.brand_name],
+        ['Generic',      v.generic_name],
+        ['Strength',     v.strength],
+        ['Form',         v.form],
+        ['Manufacturer', v.manufacturer],
+        ['Expiry',       v.expiry_date],
+        ['Mfg Date',     v.manufacturing_date],
+        ['Batch',        v.batch_number],
+      ].filter(([, val]) => val && val !== 'Not detected' && val !== 'Not visible');
+
+      if (fields.length) {
+        const rows = fields.map(([k, val]) =>
+          `<tr>
+            <td style="color:var(--txt2);padding:3px 10px 3px 0;font-size:0.7rem;white-space:nowrap">${k}</td>
+            <td style="color:var(--txt0);font-size:0.75rem">${val}</td>
+          </tr>`
+        ).join('');
+        visionHTML = `
+          <div style="
+            background:var(--bg3);
+            border:1px solid var(--border);
+            border-radius:10px;
+            padding:12px 14px;
+            margin-bottom:12px;
+          ">
+            <div style="font-size:0.65rem;color:var(--teal);font-family:'DM Mono',monospace;letter-spacing:.08em;margin-bottom:8px;">
+              🔍 VISION EXTRACTION · ${v.extraction_method}
+            </div>
+            <table style="border-collapse:collapse;width:100%">${rows}</table>
+          </div>`;
+      }
+    }
+
+    const disclaimer = data.sakshi?.medical_disclaimer || '';
+    const sources    = data.sources || [];
+    const conf       = data.ahamkara?.confidence_score;
+    const confLabel  = data.ahamkara?.confidence_label || '';
+    const latency    = data.total_latency_s;
 
     let confHTML = '';
     if (conf !== undefined) {
@@ -909,6 +974,8 @@
       <div class="msg-body">
         <div class="msg-meta">Antahkarana · ${now()}</div>
         <div class="msg-bubble">
+          ${visionHTML}
+          ${toolHTML}
           ${md(finalAnswer)}
           ${confHTML}
           ${srcHTML}

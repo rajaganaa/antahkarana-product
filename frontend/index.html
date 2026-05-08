@@ -875,70 +875,125 @@
   }
 
   function addBotMsg(data) {
-    // ── 1. Pick best answer: tool_result > final_answer ──────────
-    let finalAnswer = data.final_answer || data.sakshi?.final_answer || 'No answer returned.';
+    // ── DEBUG: log the full response so we can verify in console ──
+    console.log('[Antahkarana] Full API response:', JSON.stringify(data, null, 2));
+    console.log('[Antahkarana] data.vision:', data.vision);
+    console.log('[Antahkarana] data.tool_result:', data.tool_result);
+    console.log('[Antahkarana] data.final_answer:', data.final_answer);
 
-    // If tool ran successfully (expiry, drug interaction etc), show it first
-    let toolHTML = '';
-    if (data.tool_result && !data.tool_result.error) {
-      const tr = data.tool_result;
-      if (tr.result) {
-        // expiry checker result
-        const isExpired = tr.result.includes('EXPIRED');
-        const color = isExpired ? 'var(--rose)' : 'var(--green)';
-        const icon  = isExpired ? '❌' : '✅';
-        toolHTML = `
-          <div style="
-            background:${isExpired ? 'rgba(251,113,133,0.08)' : 'rgba(52,211,153,0.08)'};
-            border:1px solid ${color};
-            border-radius:10px;
-            padding:12px 14px;
-            margin-bottom:12px;
-            font-family:'DM Mono',monospace;
-            font-size:0.78rem;
-            color:${color};
-            white-space:pre-wrap;
-            line-height:1.6;
-          ">${icon} ${tr.result}</div>`;
-      }
-    }
-
-    // ── 2. Vision card — show if image was analyzed ───────────────
+    // ── 1. Vision card — show if image was analyzed ───────────────
     let visionHTML = '';
     const v = data.vision;
-    if (v && v.extraction_method && v.extraction_method !== 'None' && !v.error) {
+    if (v && v.extraction_method && v.extraction_method !== 'None' && v.extraction_method !== 'failed' && !v.error) {
       const fields = [
-        ['Brand',        v.brand_name],
-        ['Generic',      v.generic_name],
-        ['Strength',     v.strength],
-        ['Form',         v.form],
-        ['Manufacturer', v.manufacturer],
-        ['Expiry',       v.expiry_date],
-        ['Mfg Date',     v.manufacturing_date],
-        ['Batch',        v.batch_number],
-      ].filter(([, val]) => val && val !== 'Not detected' && val !== 'Not visible');
+        ['💊 Brand',        v.brand_name],
+        ['🧬 Generic',      v.generic_name],
+        ['💪 Strength',     v.strength],
+        ['💉 Form',         v.form],
+        ['🏭 Manufacturer', v.manufacturer],
+        ['📅 Expiry',       v.expiry_date],
+        ['🗓 Mfg Date', v.manufacturing_date],
+        ['🔢 Batch',        v.batch_number],
+      ].filter(([, val]) => val && val !== 'Not detected' && val !== 'Not visible' && val !== 'Unknown' && val !== 'N/A');
 
       if (fields.length) {
-        const rows = fields.map(([k, val]) =>
-          `<tr>
-            <td style="color:var(--txt2);padding:3px 10px 3px 0;font-size:0.7rem;white-space:nowrap">${k}</td>
-            <td style="color:var(--txt0);font-size:0.75rem">${val}</td>
-          </tr>`
-        ).join('');
+        const rows = fields.map(([k, val]) => {
+          const isExpiry = k.includes('Expiry');
+          const valStyle = isExpiry
+            ? 'color:var(--amber);font-weight:600;font-size:0.82rem'
+            : 'color:var(--txt0);font-size:0.78rem';
+          return `<tr>
+            <td style="color:var(--txt2);padding:5px 14px 5px 0;font-size:0.72rem;white-space:nowrap;vertical-align:top">${k}</td>
+            <td style="${valStyle};padding:5px 0">${val}</td>
+          </tr>`;
+        }).join('');
         visionHTML = `
           <div style="
-            background:var(--bg3);
-            border:1px solid var(--border);
-            border-radius:10px;
-            padding:12px 14px;
-            margin-bottom:12px;
+            background:linear-gradient(135deg, rgba(15,214,194,0.06), rgba(129,140,248,0.06));
+            border:1px solid var(--teal);
+            border-radius:12px;
+            padding:14px 16px;
+            margin-bottom:14px;
+            box-shadow:0 0 12px rgba(15,214,194,0.1);
           ">
-            <div style="font-size:0.65rem;color:var(--teal);font-family:'DM Mono',monospace;letter-spacing:.08em;margin-bottom:8px;">
-              🔍 VISION EXTRACTION · ${v.extraction_method}
+            <div style="font-size:0.68rem;color:var(--teal);font-family:'DM Mono',monospace;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 6px var(--teal);"></span>
+              VISION EXTRACTION · ${v.extraction_method}
             </div>
             <table style="border-collapse:collapse;width:100%">${rows}</table>
           </div>`;
       }
+    }
+
+    // ── 2. Tool result (expiry / dosage / FDA) ───────────────────
+    let toolHTML = '';
+    let hasToolResult = false;
+    if (data.tool_result && !data.tool_result.error) {
+      const tr = data.tool_result;
+      if (tr.result) {
+        hasToolResult = true;
+        const isExpired = tr.result.toUpperCase().includes('EXPIRED');
+        const isValid = tr.result.toUpperCase().includes('VALID') || tr.result.toUpperCase().includes('NOT EXPIRED');
+        const bgColor = isExpired ? 'rgba(251,113,133,0.12)' : 'rgba(52,211,153,0.10)';
+        const borderColor = isExpired ? 'var(--rose)' : 'var(--green)';
+        const textColor = isExpired ? 'var(--rose)' : 'var(--green)';
+        const icon = isExpired ? '🚨' : '✅';
+        const title = isExpired ? '⚠️ MEDICINE EXPIRED' : '✅ MEDICINE VALID';
+        toolHTML = `
+          <div style="
+            background:${bgColor};
+            border:2px solid ${borderColor};
+            border-radius:12px;
+            padding:14px 16px;
+            margin-bottom:14px;
+            box-shadow:0 0 16px ${isExpired ? 'rgba(251,113,133,0.15)' : 'rgba(52,211,153,0.12)'};
+          ">
+            <div style="font-size:0.75rem;font-weight:700;color:${textColor};margin-bottom:8px;font-family:'Syne',sans-serif;letter-spacing:0.04em;">
+              ${title}
+            </div>
+            <div style="
+              font-family:'DM Mono',monospace;
+              font-size:0.8rem;
+              color:${textColor};
+              white-space:pre-wrap;
+              line-height:1.7;
+            ">${icon} ${tr.result}</div>
+          </div>`;
+      }
+      // Handle FDA reactions display
+      if (tr.reactions && tr.reactions.length > 0) {
+        hasToolResult = true;
+        const reactRows = tr.reactions.map(r =>
+          `<tr>
+            <td style="color:var(--txt0);padding:4px 12px 4px 0;font-size:0.76rem">${r.reaction}</td>
+            <td style="color:var(--amber);font-family:'DM Mono',monospace;font-size:0.74rem;text-align:right">${r.count.toLocaleString()}</td>
+          </tr>`
+        ).join('');
+        toolHTML += `
+          <div style="
+            background:rgba(129,140,248,0.06);
+            border:1px solid var(--indigo);
+            border-radius:12px;
+            padding:14px 16px;
+            margin-bottom:14px;
+          ">
+            <div style="font-size:0.68rem;color:var(--indigo);font-family:'DM Mono',monospace;letter-spacing:.08em;margin-bottom:10px;">
+              📊 FDA ADVERSE EVENT REPORTS · ${tr.drug || ''}
+            </div>
+            <table style="border-collapse:collapse;width:100%">${reactRows}</table>
+          </div>`;
+      }
+    }
+
+    // ── 3. Final answer — suppress generic RAG for expiry queries when tool gave answer ──
+    let finalAnswer = data.final_answer || data.sakshi?.final_answer || 'No answer returned.';
+    const qType = data.manas?.question_type;
+
+    // If this was an expiry query AND we got a real tool result, 
+    // skip the generic RAG final_answer (which comes from ChromaDB with no expiry data)
+    let showFinalAnswer = true;
+    if (hasToolResult && qType === 'expiry') {
+      showFinalAnswer = false;
     }
 
     const disclaimer = data.sakshi?.medical_disclaimer || '';
@@ -967,6 +1022,8 @@
       discHTML = `<div class="disclaimer">⚕️ <span>${disclaimer}</span></div>`;
     }
 
+    const finalAnswerHTML = showFinalAnswer ? md(finalAnswer) : '';
+
     const div = document.createElement('div');
     div.className = 'msg bot';
     div.innerHTML = `
@@ -976,7 +1033,7 @@
         <div class="msg-bubble">
           ${visionHTML}
           ${toolHTML}
-          ${md(finalAnswer)}
+          ${finalAnswerHTML}
           ${confHTML}
           ${srcHTML}
           ${discHTML}

@@ -1,7 +1,7 @@
 # 🧠 Antahkarana — Unified Medical AI Reasoning Engine
 
 **Author:** RAJAGANAPATHY M, SRM University  
-**Live Demo:** https://rajaganaa.github.io/medassist-frontend  
+**Live Demo:** https://rajaganaa.github.io/antahkarana-frontend 
 **Backend:** http://antahkarana-api.centralindia.azurecontainer.io:8000  
 
 ---
